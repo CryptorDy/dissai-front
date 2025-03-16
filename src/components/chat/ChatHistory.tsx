@@ -54,7 +54,7 @@ interface ChatHistoryProps {
   onDeleteMessage?: (messageId: string) => void;
 }
 
-export function ChatHistory({ messages, currentUserId, onDeleteMessage }: ChatHistoryProps) {
+export function ChatHistory({ messages = [], currentUserId, onDeleteMessage }: ChatHistoryProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
 

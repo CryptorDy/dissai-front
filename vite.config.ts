@@ -9,11 +9,13 @@ export default defineConfig({
   define: {
     global: 'window'
   },
-  base: '/',
   server: {
-    historyApiFallback: true
-  },
-  preview: {
-    historyApiFallback: true
+    proxy: {
+      '/api': {
+        target: 'https://cryptordy-aidiscussion-9bff.twc1.net',
+        changeOrigin: true,
+        secure: false
+      }
+    }
   }
 });

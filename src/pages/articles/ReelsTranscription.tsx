@@ -13,7 +13,7 @@ type TabType = 'accounts' | 'single';
 function ReelsTranscription() {
   const navigate = useNavigate();
   const { token } = useAuth();
-  const { addTask, removeTask, updateTask, canAddTask } = useGeneration();
+  const { startGeneration: addTask, removeTask, updateTask, canAddTask } = useGeneration();
   const { showSuccess, showError } = useToast();
   const [activeTab, setActiveTab] = useState<TabType>('accounts');
   

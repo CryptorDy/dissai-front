@@ -32,6 +32,11 @@ function ReelsResult() {
         return location.state.result;
       }
 
+      // Если данные получены от api/tasks/result
+      if (location.state.status === 'Completed' && Array.isArray(location.state.result)) {
+        return location.state.result;
+      }
+
       // Если данные получены от api/knowledge/file
       if (location.state.content) {
         try {

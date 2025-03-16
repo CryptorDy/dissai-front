@@ -4,6 +4,7 @@ import { useToast } from './ToastContext';
 
 interface AuthContextType {
   isAuthenticated: boolean;
+  isLoading: boolean;
   token: string | null;
   profile: UserProfile | null;
   login: (token: string) => void;
@@ -13,13 +14,21 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { showError } = useToast();
   const [token, setToken] = useState<string | null>(() => {
     return localStorage.getItem('auth_token');
   });
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [isLoadingProfile, setIsLoadingProfile] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const login = (newToken: string) => {
     localStorage.setItem('auth_token', newToken);
@@ -39,12 +48,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const loadProfile = async () => {
-    if (!token || isLoadingProfile) return;
+    if (!token) {
+      setIsLoading(false);
+      return;
+    }
     
-    setIsLoadingProfile(true);
     try {
       const data = await authService.getProfile();
-      // Убедимся, что данные профиля сериализуемы
       const safeProfile: UserProfile = {
         nickname: data.nickname || '',
         email: data.email || ''
@@ -58,7 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         showError('Ошибка при загрузке профиля');
       }
     } finally {
-      setIsLoadingProfile(false);
+      setIsLoading(false);
     }
   };
 
@@ -68,23 +78,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    // Проверяем токен при инициализации
     const storedToken = localStorage.getItem('auth_token');
     if (storedToken) {
       setToken(storedToken);
+    } else {
+      setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    // Загружаем профиль, когда есть токен и профиль еще не загружен
-    if (token && !profile) {
+    if (token) {
       loadProfile();
     }
-  }, [token, profile]);
+  }, [token]);
 
-  // Создаем контекст с сериализуемыми данными
   const contextValue: AuthContextType = {
     isAuthenticated: !!token,
+    isLoading,
     token,
     profile,
     login,
@@ -99,10 +109,4 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-}
+export default AuthProvider;

@@ -1,149 +1,152 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { GenerationTask, GenerationType } from '../types/generation';
-import { useToast } from './ToastContext';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { GenerationTask, GenerationStatus } from '../types/generation';
+import { tasksApi } from '../services/api';
+
+const TASKS_STORAGE_KEY = 'generation_tasks';
+const MAX_CONCURRENT_TASKS = 2;
 
 interface GenerationContextType {
   tasks: GenerationTask[];
-  addTask: (type: GenerationType, title: string) => string | null;
-  updateTask: (id: string, updates: Partial<GenerationTask>) => void;
-  removeTask: (id: string) => void;
-  cancelTask: (id: string) => void;
-  clearCompletedTasks: () => void;
-  getTask: (id: string) => GenerationTask | undefined;
-  hasPendingTasks: boolean;
+  startGeneration: (taskId: string) => void;
+  cancelTask: (taskId: string) => void;
+  fetchTaskResult: (taskId: string) => Promise<any>;
+  fetchTasks: () => Promise<void>;
+  markTaskRedirected: (taskId: string) => void;
   canAddTask: boolean;
 }
 
 const GenerationContext = createContext<GenerationContextType | undefined>(undefined);
 
-const STORAGE_KEY = 'generation_tasks';
-const MAX_PARALLEL_TASKS = 2; // Максимальное количество параллельных задач
-const COMPLETED_TASK_DISPLAY_TIME = 5000; // 5 секунд показа завершенной задачи
-
-export function GenerationProvider({ children }: { children: React.ReactNode }) {
-  const { showError, showSuccess } = useToast();
-  const [tasks, setTasks] = useState<GenerationTask[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (error) {
-      console.error('Error loading generation tasks:', error);
-    }
-    return [];
-  });
-
-  // Проверяем, можно ли добавить новую задачу
-  const pendingTasksCount = tasks.filter(task => task.status === 'pending').length;
-  const canAddTask = pendingTasksCount < MAX_PARALLEL_TASKS;
-
-  // Сохраняем задачи в localStorage при изменении
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
-  }, [tasks]);
-
-  // Мемоизируем функции, чтобы избежать лишних ререндеров
-  const addTask = useCallback((type: GenerationType, title: string): string | null => {
-    // Проверяем количество активных задач перед добавлением новой
-    const pendingTasks = tasks.filter(task => task.status === 'pending');
-    if (pendingTasks.length >= MAX_PARALLEL_TASKS) {
-      showError(`Достигнут лимит параллельных задач (${MAX_PARALLEL_TASKS}). Дождитесь завершения текущих задач.`);
-      return null;
-    }
-
-    const id = Date.now().toString();
-    const newTask: GenerationTask = {
-      id,
-      type,
-      title,
-      status: 'pending',
-      progress: 0,
-      startedAt: Date.now(),
-      showResult: false,
-      canCancel: true
-    };
-
-    setTasks(prev => [...prev, newTask]);
-    return id;
-  }, [tasks, showError]);
-
-  const updateTask = useCallback((id: string, updates: Partial<GenerationTask>) => {
-    setTasks(prev => prev.map(task => {
-      if (task.id === id) {
-        const updatedTask = { 
-          ...task, 
-          ...updates,
-          completedAt: updates.status === 'completed' ? Date.now() : task.completedAt,
-          showResult: updates.status === 'completed' ? true : task.showResult
-        };
-        
-        // Если задача завершена, устанавливаем таймер для её скрытия
-        if (updates.status === 'completed') {
-          setTimeout(() => {
-            setTasks(current => current.map(t => 
-              t.id === id ? { ...t, showResult: false } : t
-            ));
-          }, COMPLETED_TASK_DISPLAY_TIME);
-        }
-        
-        return updatedTask;
-      }
-      return task;
-    }));
-  }, []);
-
-  const removeTask = useCallback((id: string) => {
-    setTasks(prev => prev.filter(task => task.id !== id));
-  }, []);
-
-  const cancelTask = useCallback((id: string) => {
-    setTasks(prev => prev.map(task => {
-      if (task.id === id && task.status === 'pending') {
-        showSuccess('Задача отменена');
-        return {
-          ...task,
-          status: 'cancelled',
-          completedAt: Date.now(),
-          canCancel: false
-        };
-      }
-      return task;
-    }));
-  }, [showSuccess]);
-
-  const clearCompletedTasks = useCallback(() => {
-    setTasks(prev => prev.filter(task => task.status === 'pending'));
-    showSuccess('История задач очищена');
-  }, [showSuccess]);
-
-  const getTask = useCallback((id: string) => {
-    return tasks.find(task => task.id === id);
-  }, [tasks]);
-
-  const hasPendingTasks = tasks.some(task => task.status === 'pending');
-
-  return (
-    <GenerationContext.Provider value={{
-      tasks,
-      addTask,
-      updateTask,
-      removeTask,
-      cancelTask,
-      clearCompletedTasks,
-      getTask,
-      hasPendingTasks,
-      canAddTask
-    }}>
-      {children}
-    </GenerationContext.Provider>
-  );
-}
-
-export function useGeneration() {
+export const useGeneration = () => {
   const context = useContext(GenerationContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error('useGeneration must be used within a GenerationProvider');
   }
   return context;
-}
+};
+
+export const GenerationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [tasks, setTasks] = useState<GenerationTask[]>(() => {
+    const storedTasks = localStorage.getItem(TASKS_STORAGE_KEY);
+    return storedTasks ? JSON.parse(storedTasks) : [];
+  });
+
+  // Сохраняем задачи в localStorage при каждом изменении
+  useEffect(() => {
+    localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(tasks));
+  }, [tasks]);
+
+  const getActiveTasks = useCallback(() => {
+    return tasks.filter(task => 
+      task.status === 'pending' && 
+      !task.redirected && 
+      Date.now() - task.startedAt < 1000 * 60 * 30 // 30 минут
+    );
+  }, [tasks]);
+
+  const canAddTask = getActiveTasks().length < MAX_CONCURRENT_TASKS;
+
+  const startGeneration = useCallback((taskId: string) => {
+    const newTask: GenerationTask = {
+      id: taskId,
+      type: 'pending',
+      title: 'Generation in Progress',
+      status: 'pending',
+      progress: 0,
+      startedAt: Date.now(),
+      canCancel: true,
+      redirected: false
+    };
+    setTasks(prev => [newTask, ...prev]);
+  }, []);
+
+  const cancelTask = useCallback(async (taskId: string) => {
+    try {
+      await tasksApi.cancelTask(taskId);
+      setTasks(prev =>
+        prev.map(task =>
+          task.id === taskId
+            ? { ...task, status: 'cancelled', canCancel: false }
+            : task
+        )
+      );
+    } catch (error) {
+      console.error('Error cancelling task:', error);
+    }
+  }, []);
+
+  const markTaskRedirected = useCallback((taskId: string) => {
+    setTasks(prev =>
+      prev.map(task =>
+        task.id === taskId
+          ? { ...task, redirected: true }
+          : task
+      )
+    );
+  }, []);
+
+  const fetchTaskResult = useCallback(async (taskId: string) => {
+    try {
+      const response = await tasksApi.getTaskResult(taskId);
+      const result = response.data;
+
+      setTasks(prev =>
+        prev.map(task =>
+          task.id === taskId
+            ? {
+                ...task,
+                status: result.status.toLowerCase() as GenerationStatus,
+                progress: result.status === 'Completed' ? 100 : task.progress,
+                result: result.result,
+                error: result.error,
+                completedAt: result.status === 'Completed' ? Date.now() : undefined,
+                canCancel: false
+              }
+            : task
+        )
+      );
+
+      return result.result;
+    } catch (error) {
+      console.error('Error fetching task result:', error);
+      return null;
+    }
+  }, []);
+
+  const fetchTasks = useCallback(async () => {
+    try {
+      const response = await tasksApi.getTasks();
+      const mappedTasks = response.data.tasks.map((apiTask: any): GenerationTask => ({
+        id: apiTask.id,
+        type: apiTask.type.toLowerCase(),
+        title: `${apiTask.type} Generation`,
+        status: apiTask.status.toLowerCase() as GenerationStatus,
+        progress: apiTask.isCompleted ? 100 : 0,
+        startedAt: new Date(apiTask.startTime).getTime(),
+        completedAt: apiTask.endTime ? new Date(apiTask.endTime).getTime() : undefined,
+        canCancel: !apiTask.isCompleted,
+        result: undefined,
+        redirected: false
+      }));
+      setTasks(mappedTasks);
+    } catch (error) {
+      console.error('Error fetching tasks:', error);
+    }
+  }, []);
+
+  return (
+    <GenerationContext.Provider
+      value={{
+        tasks,
+        startGeneration,
+        cancelTask,
+        fetchTaskResult,
+        fetchTasks,
+        markTaskRedirected,
+        canAddTask
+      }}
+    >
+      {children}
+    </GenerationContext.Provider>
+  );
+};

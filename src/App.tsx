@@ -35,35 +35,39 @@ function App() {
       <ThemeProvider>
         <ToastProvider>
           <AuthProvider>
-            <GenerationProvider>
-              <Router>
-                <GenerationStatus />
-                <Routes>
-                  {/* Публичные маршруты */}
-                  <Route path="/auth/login" element={<Login />} />
-                  <Route path="/auth/register" element={<Register />} />
-                  <Route path="/auth/email-confirmation" element={<EmailConfirmation />} />
-                  <Route path="/auth/setup-nickname" element={<SetupNickname />} />
-                  <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Router>
+              <Routes>
+                {/* Публичные маршруты */}
+                <Route path="/auth/login" element={<Login />} />
+                <Route path="/auth/register" element={<Register />} />
+                <Route path="/auth/email-confirmation" element={<EmailConfirmation />} />
+                <Route path="/auth/setup-nickname" element={<SetupNickname />} />
+                <Route path="/privacy-policy" element={<PrivacyPolicy />} />
 
-                  {/* Защищенные маршруты */}
-                  <Route path="/" element={<PrivateRoute><Home /></PrivateRoute>} />
-                  <Route path="/chat" element={<PrivateRoute><Chat /></PrivateRoute>} />
-                  <Route path="/articles/regular" element={<PrivateRoute><RegularArticle /></PrivateRoute>} />
-                  <Route path="/articles/educational" element={<PrivateRoute><EducationalArticle /></PrivateRoute>} />
-                  <Route path="/articles/notes" element={<PrivateRoute><NotesArticle /></PrivateRoute>} />
-                  <Route path="/articles/simplify" element={<PrivateRoute><SimplifyArticle /></PrivateRoute>} />
-                  <Route path="/articles/content-plan" element={<PrivateRoute><ContentPlan /></PrivateRoute>} />
-                  <Route path="/articles/reels" element={<PrivateRoute><ReelsTranscription /></PrivateRoute>} />
-                  <Route path="/articles/reels/result" element={<PrivateRoute><ReelsResult /></PrivateRoute>} />
-                  <Route path="/roadmap" element={<PrivateRoute><Roadmap /></PrivateRoute>} />
-                  <Route path="/roadmap/result" element={<PrivateRoute><RoadmapResult /></PrivateRoute>} />
-                  <Route path="/knowledge" element={<PrivateRoute><Knowledge /></PrivateRoute>} />
-                  <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
-                  <Route path="/tasks" element={<PrivateRoute><TaskProgress /></PrivateRoute>} />
-                </Routes>
-              </Router>
-            </GenerationProvider>
+                {/* Защищенные маршруты с GenerationProvider */}
+                <Route path="/*" element={
+                  <GenerationProvider>
+                    <Routes>
+                      <Route path="/" element={<PrivateRoute><Home /></PrivateRoute>} />
+                      <Route path="/chat" element={<PrivateRoute><Chat /></PrivateRoute>} />
+                      <Route path="/articles/regular" element={<PrivateRoute><RegularArticle /></PrivateRoute>} />
+                      <Route path="/articles/educational" element={<PrivateRoute><EducationalArticle /></PrivateRoute>} />
+                      <Route path="/articles/notes" element={<PrivateRoute><NotesArticle /></PrivateRoute>} />
+                      <Route path="/articles/simplify" element={<PrivateRoute><SimplifyArticle /></PrivateRoute>} />
+                      <Route path="/articles/content-plan" element={<PrivateRoute><ContentPlan /></PrivateRoute>} />
+                      <Route path="/articles/reels" element={<PrivateRoute><ReelsTranscription /></PrivateRoute>} />
+                      <Route path="/articles/reels/result" element={<PrivateRoute><ReelsResult /></PrivateRoute>} />
+                      <Route path="/roadmap" element={<PrivateRoute><Roadmap /></PrivateRoute>} />
+                      <Route path="/roadmap/result" element={<PrivateRoute><RoadmapResult /></PrivateRoute>} />
+                      <Route path="/knowledge" element={<PrivateRoute><Knowledge /></PrivateRoute>} />
+                      <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
+                      <Route path="/tasks" element={<PrivateRoute><TaskProgress /></PrivateRoute>} />
+                    </Routes>
+                    <GenerationStatus />
+                  </GenerationProvider>
+                } />
+              </Routes>
+            </Router>
           </AuthProvider>
         </ToastProvider>
       </ThemeProvider>

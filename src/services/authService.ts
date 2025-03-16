@@ -1,27 +1,6 @@
-import axios from 'axios';
 import { API_URL } from '../config/api';
 import { AUTH_ENDPOINTS, LoginRequest, RegisterRequest, EmailConfirmationRequest, AuthResponse } from '../config/auth';
-
-const api = axios.create({
-  baseURL: API_URL,
-  headers: {
-    'Content-Type': 'application/json'
-  }
-});
-
-// Добавляем перехватчик для добавления токена к запросам
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('auth_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
+import { api } from './api';
 
 export interface UserProfile {
   nickname: string;
@@ -43,11 +22,9 @@ export const authService = {
         token: data.Token
       };
     } catch (error: any) {
-      // Если сервер вернул ответ с ошибкой
       if (error.response?.data) {
         return error.response.data;
       }
-      // Если произошла другая ошибка
       throw error;
     }
   },
@@ -79,7 +56,7 @@ export const authService = {
 
   googleAuth: async (accessToken: string): Promise<AuthResponse> => {
     try {
-      const response = await api.post('/auth/google', { accessToken });
+      const response = await api.post('/api/auth/google', { accessToken });
       const data = response.data;
       
       if (data.Token) {
@@ -108,7 +85,7 @@ export const authService = {
 
   getProfile: async (): Promise<UserProfile> => {
     try {
-      const response = await api.get('/Account/profile');
+      const response = await api.get('/api/Account/profile');
       return {
         nickname: response.data.Nickname || '',
         email: response.data.Email || ''
@@ -123,9 +100,7 @@ export const authService = {
 
   setNickname: async (nickname: string, token: string): Promise<void> => {
     try {
-      await api.post('/Account/nickname', { nickname }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.post('/api/Account/nickname', { nickname });
     } catch (error: any) {
       if (error.response?.data?.message) {
         throw new Error(error.response.data.message);
