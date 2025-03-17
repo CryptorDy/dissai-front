@@ -8,7 +8,7 @@ import { authService } from '../../services/authService';
 
 function Login() {
   const navigate = useNavigate();
-  const { showSuccess } = useToast();
+  const { showError } = useToast();
   const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -37,8 +37,7 @@ function Login() {
       }
 
       login(response.Token);
-      showSuccess('Успешная авторизация');
-      navigate('/', { replace: true });
+      navigate('/dashboard', { replace: true });
     } catch (error: any) {
       const errorMessage = error.response?.data?.Error || error.message || 'Ошибка при авторизации';
       setFormError(errorMessage);
@@ -53,7 +52,7 @@ function Login() {
         const result = await authService.googleAuth(response.access_token);
         if (result.token) {
           login(result.token);
-          navigate('/', { replace: true });
+          navigate('/dashboard', { replace: true });
         } else {
           navigate('/auth/setup-nickname');
         }

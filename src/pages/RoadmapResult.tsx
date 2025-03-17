@@ -32,7 +32,7 @@ interface RoadmapData {
 function RoadmapResult() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { showSuccess, showError } = useToast();
+  const { showError } = useToast();
   const [roadmapData, setRoadmapData] = useState<RoadmapData | null>(null);
   const [completedTasks, setCompletedTasks] = useState<number[]>([]);
   const [isEditing, setIsEditing] = useState(false);
@@ -140,7 +140,6 @@ function RoadmapResult() {
         };
 
         await knowledgeApi.saveItem(newItem);
-        showSuccess('Родмап успешно сохранен в базе знаний');
         setShowSaveDialog(false);
         navigate('/knowledge');
       } catch (error) {

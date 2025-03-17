@@ -12,7 +12,7 @@ interface ValidationErrors {
 
 function Register() {
   const navigate = useNavigate();
-  const { showSuccess } = useToast();
+  const { showError } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -91,7 +91,6 @@ function Register() {
       }
 
       // Если нет ошибки, считаем регистрацию успешной
-      showSuccess('Регистрация успешна!');
       navigate('/auth/email-confirmation');
       
     } catch (error: any) {

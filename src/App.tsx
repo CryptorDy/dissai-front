@@ -29,6 +29,7 @@ import SetupNickname from './pages/auth/SetupNickname';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import Profile from './pages/Profile';
 import TaskProgress from './pages/TaskProgress';
+import Landing from './pages/Landing';
 
 function App() {
   return (
@@ -41,6 +42,7 @@ function App() {
                 <div className="min-h-screen">
                   <Routes>
                     {/* Публичные маршруты */}
+                    <Route path="/" element={<Landing />} />
                     <Route path="/auth/login" element={<Login />} />
                     <Route path="/auth/register" element={<Register />} />
                     <Route path="/auth/email-confirmation" element={<EmailConfirmation />} />
@@ -48,7 +50,7 @@ function App() {
                     <Route path="/privacy-policy" element={<PrivacyPolicy />} />
 
                     {/* Защищенные маршруты */}
-                    <Route path="/" element={<PrivateRoute><Home /></PrivateRoute>} />
+                    <Route path="/dashboard" element={<PrivateRoute><Home /></PrivateRoute>} />
                     <Route path="/chat" element={<PrivateRoute><Chat /></PrivateRoute>} />
                     <Route path="/articles/regular" element={<PrivateRoute><RegularArticle /></PrivateRoute>} />
                     <Route path="/articles/educational" element={<PrivateRoute><EducationalArticle /></PrivateRoute>} />

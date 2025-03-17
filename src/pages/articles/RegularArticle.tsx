@@ -40,7 +40,7 @@ const ARTICLE_LENGTHS = [
 ];
 
 function RegularArticle() {
-  const { showSuccess, showError } = useToast();
+  const { showError } = useToast();
   const [currentView, setCurrentView] = useState<'initial' | ArticleGenerationStep | 'loading'>('initial');
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<string[]>([]);
@@ -199,7 +199,6 @@ function RegularArticle() {
         };
 
         await knowledgeApi.saveItem(newItem);
-        showSuccess('Статья успешно сохранена в базе знаний');
         setShowSaveDialog(false);
       } catch (error) {
         console.error('Failed to save article:', error);

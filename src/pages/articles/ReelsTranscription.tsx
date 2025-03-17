@@ -14,7 +14,7 @@ function ReelsTranscription() {
   const navigate = useNavigate();
   const { token } = useAuth();
   const { startGeneration, canAddTask } = useGeneration();
-  const { showSuccess, showError } = useToast();
+  const { showError } = useToast();
   const [activeTab, setActiveTab] = useState<TabType>('accounts');
   
   const [usernames, setUsernames] = useState<string[]>([]);
@@ -90,8 +90,7 @@ function ReelsTranscription() {
       }
 
       startGeneration(data.taskId);
-      showSuccess('Анализ Reels начат');
-      navigate('/');
+      navigate('/dashboard');
 
     } catch (error) {
       console.error('Error analyzing accounts:', error);
@@ -145,8 +144,7 @@ function ReelsTranscription() {
       }
 
       startGeneration(data.taskId);
-      showSuccess('Анализ Reels начат');
-      navigate('/');
+      navigate('/dashboard');
 
     } catch (error) {
       console.error('Error analyzing single reel:', error);

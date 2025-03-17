@@ -10,7 +10,7 @@ import { useToast } from '../../context/ToastContext';
 function ReelsResult() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { showSuccess, showError } = useToast();
+  const { showError } = useToast();
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [items, setItems] = useState<KnowledgeItem[]>([]);
   const [isLoadingItems, setIsLoadingItems] = useState(false);
@@ -97,7 +97,6 @@ function ReelsResult() {
         };
 
         await knowledgeApi.saveItem(newItem);
-        showSuccess('Reels успешно сохранены в базе знаний');
         setShowSaveDialog(false);
         navigate('/knowledge');
       } catch (error) {

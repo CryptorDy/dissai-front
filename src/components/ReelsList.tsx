@@ -117,7 +117,7 @@ function DeleteDialog({ isOpen, onConfirm, onCancel, title, message }: DeleteDia
 }
 
 export function ReelsList({ reels, sourceId, onReelsDeleted }: ReelsListProps) {
-  const { showSuccess, showError } = useToast();
+  const { showError } = useToast();
   const { token } = useAuth();
   const [expandedComments, setExpandedComments] = useState<{ [key: string]: boolean }>({});
   const [expandedVideos, setExpandedVideos] = useState<{ [key: string]: boolean }>({});
@@ -254,8 +254,6 @@ export function ReelsList({ reels, sourceId, onReelsDeleted }: ReelsListProps) {
         if (!response.ok) {
           throw new Error(`Ошибка при перемещении: ${response.status}`);
         }
-        
-        showSuccess('Reels успешно добавлены в существующую статью');
       } else {
         const newFile: KnowledgeItem = {
           type: 'file',
@@ -283,8 +281,6 @@ export function ReelsList({ reels, sourceId, onReelsDeleted }: ReelsListProps) {
         if (!response.ok) {
           throw new Error(`Ошибка при перемещении: ${response.status}`);
         }
-
-        showSuccess('Новая статья с Reels успешно создана');
       }
       
       await loadItems();
@@ -324,7 +320,6 @@ export function ReelsList({ reels, sourceId, onReelsDeleted }: ReelsListProps) {
         throw new Error(`Ошибка при удалении: ${response.status}`);
       }
 
-      showSuccess('Reels успешно удалены');
       setSelectedReels([]);
       setShowDeleteDialog(false);
       
