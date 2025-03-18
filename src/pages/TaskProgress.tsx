@@ -4,6 +4,7 @@ import { useGeneration } from '../context/GenerationContext';
 import { Clock, Ban, ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { tasksApi } from '../services/api';
 
 function TaskProgress() {
   const { tasks, cancelTask, fetchTasks } = useGeneration();
@@ -11,6 +12,17 @@ function TaskProgress() {
 
   useEffect(() => {
     fetchTasks();
+
+    const markAllAsViewed = async () => {
+      try {
+        const response = await tasksApi.markAllTasksViewed();
+        console.log('Все задачи помечены как просмотренные:', response.data);
+      } catch (error) {
+        console.error('Ошибка при пометке всех задач как просмотренных:', error);
+      }
+    };
+
+    markAllAsViewed();
   }, [fetchTasks]);
 
   const handleViewResult = (taskId: string, type: string) => {

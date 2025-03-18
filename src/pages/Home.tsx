@@ -109,14 +109,17 @@ function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-900 dark:to-gray-800 transition-colors duration-200">
-      <ThemeToggle />
+      <div className="fixed top-4 right-4">
+        <ThemeToggle />
+      </div>
+      
       <div className="max-w-7xl mx-auto px-4 py-12">
         <header className="text-center mb-16">
-          <h1 className="text-4xl md:text-5xl font-semibold text-gray-900 dark:text-white mb-6">
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
             Dissai.io
           </h1>
-          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-            Интеллектуальный помощник для создания и управления контентом
+          <p className="text-xl text-gray-600 dark:text-gray-300">
+            Цифровая мастерская интеллектуального контента
           </p>
         </header>
 
@@ -164,6 +167,7 @@ function Home() {
             </button>
           ))}
         </div>
+        
       </div>
     </div>
   );

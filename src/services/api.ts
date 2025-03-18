@@ -49,7 +49,19 @@ export const tasksApi = {
   getTasks: () => api.get<TaskListResponse>('/tasks'),
   getTaskResult: (taskId: string) => api.get<TaskResultResponse>(`/tasks/${taskId}/result`),
   cancelTask: (taskId: string) => api.post(`/tasks/${taskId}/cancel`),
-  deleteTask: (taskId: string) => api.delete(`/tasks/${taskId}`)
+  deleteTask: (taskId: string) => api.delete(`/tasks/${taskId}`),
+  getUnviewedTasks: () => api.get<Array<{
+    id: string;
+    type: string;
+    name: string;
+    status: string;
+    startTime: string;
+    endTime: string;
+    isCompleted: boolean;
+    isViewed: boolean;
+  }>>('/tasks/unviewed'),
+  markTaskViewed: (taskId: string) => api.post(`/tasks/${taskId}/mark-viewed`),
+  markAllTasksViewed: () => api.post('/tasks/mark-all-viewed')
 };
 
 export const roadmapApi = {

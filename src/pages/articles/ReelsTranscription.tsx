@@ -89,7 +89,7 @@ function ReelsTranscription() {
         throw new Error('Не получен ID задачи');
       }
 
-      startGeneration(data.taskId);
+      startGeneration(data.taskId, 'reels', 'Анализ аккаунтов Reels');
       navigate('/dashboard');
 
     } catch (error) {
@@ -143,7 +143,7 @@ function ReelsTranscription() {
         throw new Error('Не получен ID задачи');
       }
 
-      startGeneration(data.taskId);
+      startGeneration(data.taskId, 'reels', 'Анализ Reels');
       navigate('/dashboard');
 
     } catch (error) {

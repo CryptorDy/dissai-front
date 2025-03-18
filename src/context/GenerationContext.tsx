@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { GenerationTask, GenerationStatus } from '../types/generation';
+import React, { createContext, useContext, useState, useCallback } from 'react';
+import { GenerationTask, GenerationStatus, GenerationType } from '../types/generation';
 import { tasksApi } from '../services/api';
 
 const TASKS_STORAGE_KEY = 'generation_tasks';
@@ -7,7 +7,7 @@ const MAX_CONCURRENT_TASKS = 2;
 
 interface GenerationContextType {
   tasks: GenerationTask[];
-  startGeneration: (taskId: string) => void;
+  startGeneration: (taskId: string, type: GenerationType, title: string) => void;
   cancelTask: (taskId: string) => void;
   fetchTaskResult: (taskId: string) => Promise<any>;
   fetchTasks: () => Promise<void>;
@@ -26,14 +26,7 @@ export const useGeneration = () => {
 };
 
 export const GenerationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [tasks, setTasks] = useState<GenerationTask[]>(() => {
-    const storedTasks = localStorage.getItem(TASKS_STORAGE_KEY);
-    return storedTasks ? JSON.parse(storedTasks) : [];
-  });
-
-  useEffect(() => {
-    localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(tasks));
-  }, [tasks]);
+  const [tasks, setTasks] = useState<GenerationTask[]>([]);
 
   const getActiveTasks = useCallback(() => {
     return tasks.filter(task => 
@@ -45,11 +38,11 @@ export const GenerationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const canAddTask = getActiveTasks().length < MAX_CONCURRENT_TASKS;
 
-  const startGeneration = useCallback((taskId: string) => {
+  const startGeneration = useCallback((taskId: string, type: GenerationType = 'reels', title: string = 'Анализ Reels') => {
     const newTask: GenerationTask = {
       id: taskId,
-      type: 'reels',
-      title: 'Анализ Reels',
+      type: type,
+      title: title,
       status: 'pending',
       progress: 0,
       startedAt: Date.now(),
@@ -88,18 +81,29 @@ export const GenerationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     try {
       const response = await tasksApi.getTaskResult(taskId);
       const result = response.data;
+      
+      // Убедимся, что статус корректно преобразован в нижний регистр
+      const apiStatus = (result.status || '').toLowerCase();
+      
+      // Принудительно установим правильный статус на основе данных ответа
+      let status: GenerationStatus = 'pending';
+      if (apiStatus === 'successful' || apiStatus === 'successfull') {
+        status = 'completed';
+      } else if (apiStatus === 'cancelled' || apiStatus === 'error' || apiStatus === 'failed') {
+        status = 'cancelled';
+      }
 
       setTasks(prev =>
         prev.map(task =>
           task.id === taskId
             ? {
                 ...task,
-                status: result.status.toLowerCase() as GenerationStatus,
-                progress: result.status === 'Completed' ? 100 : task.progress,
+                status: status,
+                progress: status === 'completed' ? 100 : task.progress,
                 result: result.result,
-                error: result.error,
-                completedAt: result.status === 'Completed' ? Date.now() : undefined,
-                canCancel: false
+                error: result.error || undefined,
+                completedAt: status === 'completed' ? Date.now() : undefined,
+                canCancel: status === 'pending'
               }
             : task
         )
@@ -115,38 +119,43 @@ export const GenerationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const fetchTasks = useCallback(async () => {
     try {
       const response = await tasksApi.getTasks();
-      const mappedTasks = response.data.tasks.map((apiTask: any): GenerationTask => ({
-        id: apiTask.id,
-        type: apiTask.type.toLowerCase(),
-        title: `${apiTask.type} Generation`,
-        status: apiTask.status.toLowerCase() as GenerationStatus,
-        progress: apiTask.isCompleted ? 100 : 0,
-        startedAt: new Date(apiTask.startTime).getTime(),
-        completedAt: apiTask.endTime ? new Date(apiTask.endTime).getTime() : undefined,
-        canCancel: !apiTask.isCompleted,
-        result: undefined,
-        redirected: false
-      }));
+      const mappedTasks = response.data.tasks.map((apiTask: any): GenerationTask => {
+        // Определяем статус задачи
+        let status: GenerationStatus = 'pending';
+        
+        if (typeof apiTask.status === 'string') {
+          // Убедимся, что статус корректно преобразован в нижний регистр
+          const statusLower = apiTask.status.toLowerCase();
+          
+          // Проверяем на "successful" или "successfull" (с двумя "l")
+          if (statusLower === 'successful' || statusLower === 'successfull') {
+            status = 'completed';
+          } else if (statusLower === 'cancelled' || statusLower === 'error' || statusLower === 'failed') {
+            status = 'cancelled';
+          }
+        }
+        
+        return {
+          id: apiTask.id,
+          type: (apiTask.type || 'unknown').toLowerCase(),
+          title: apiTask.name || `${apiTask.type || 'Unknown'} Generation`,
+          status: status,
+          progress: status === 'completed' ? 100 : 0,
+          startedAt: apiTask.startTime ? new Date(apiTask.startTime).getTime() : Date.now(),
+          completedAt: apiTask.endTime ? new Date(apiTask.endTime).getTime() : undefined,
+          canCancel: status === 'pending',
+          result: undefined,
+          redirected: false,
+          name: apiTask.name,
+          isViewed: apiTask.isViewed
+        };
+      });
+      
       setTasks(mappedTasks);
     } catch (error) {
       console.error('Error fetching tasks:', error);
     }
   }, []);
-
-  // Автоматическое обновление статуса задач
-  useEffect(() => {
-    const pendingTasks = tasks.filter(task => task.status === 'pending');
-    
-    if (pendingTasks.length > 0) {
-      const intervalId = setInterval(() => {
-        pendingTasks.forEach(task => {
-          fetchTaskResult(task.id);
-        });
-      }, 5000);
-      
-      return () => clearInterval(intervalId);
-    }
-  }, [tasks, fetchTaskResult]);
 
   return (
     <GenerationContext.Provider
