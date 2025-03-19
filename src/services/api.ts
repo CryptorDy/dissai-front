@@ -136,9 +136,20 @@ function mapKnowledgeItemToApi(item: KnowledgeItem): any {
 
 // Вспомогательная функция для преобразования API элемента в KnowledgeItem
 function mapApiItemToKnowledgeItem(item: KnowledgeItemDto): KnowledgeItem {
-  return {
+  console.log('mapApiItemToKnowledgeItem вызван с:', item);
+  
+  if (!item) {
+    return {
+      id: '',
+      itemType: 'file' as 'file',
+      name: 'Ошибка загрузки',
+      parentId: null
+    };
+  }
+  
+  const result: KnowledgeItem = {
     id: item.id,
-    itemType: item.itemType === 'folder' ? 'folder' : 'file',
+    itemType: (item.itemType === 'folder' ? 'folder' : 'file') as 'file' | 'folder',
     name: item.name,
     fileType: item.fileType || undefined,
     content: item.content || undefined,
@@ -149,16 +160,16 @@ function mapApiItemToKnowledgeItem(item: KnowledgeItemDto): KnowledgeItem {
     parentId: item.parentId,
     metadata: item.metadata
   };
+  
+  return result;
 }
 
 export const knowledgeApi = {
   // Получение структуры дерева
   getItems: () => api.get<KnowledgeRootDto | KnowledgeItemDto[]>('/knowledge').then(response => {
-    console.log('API Response for getItems:', response.data);
     
     // Проверяем, является ли ответ корневым объектом с Children
     if (response.data && typeof response.data === 'object' && 'Children' in response.data && Array.isArray(response.data.Children)) {
-      console.log('Processing root object with Children');
       // Преобразуем элементы из Children с CamelCase-именами в KnowledgeItemDto
       const items = response.data.Children.map(item => mapCamelCaseToKnowledgeItemDto(item))
         .map(item => mapApiItemToKnowledgeItem(item));
@@ -167,10 +178,8 @@ export const knowledgeApi = {
     } 
     // Если ответ уже является массивом
     else if (Array.isArray(response.data)) {
-      console.log('Processing array response');
       // Проверяем формат первого элемента, чтобы понять, нужно ли преобразование CamelCase
       if (response.data.length > 0 && response.data[0] && typeof response.data[0] === 'object' && 'Id' in response.data[0]) {
-        console.log('Processing CamelCase array');
         return response.data.map(item => mapCamelCaseToKnowledgeItemDto(item))
           .map(item => mapApiItemToKnowledgeItem(item));
       } else {
@@ -184,8 +193,23 @@ export const knowledgeApi = {
   }),
   
   // Получение файла по ID
-  getFile: (id: string) => api.get<KnowledgeItemDto>(`/knowledge/file/${id}`)
-    .then(response => mapApiItemToKnowledgeItem(response.data)),
+  getFile: (id: string) => {
+    return api.get<KnowledgeItemDto | any>(`/knowledge/file/${id}`)
+      .then(response => {
+        
+        // Проверяем, нужно ли преобразование из CamelCase
+        if (response.data && typeof response.data === 'object' && 'Id' in response.data) {
+          const normalizedData = mapCamelCaseToKnowledgeItemDto(response.data);
+          return mapApiItemToKnowledgeItem(normalizedData);
+        } else {
+          // Если данные уже в нужном формате
+          return mapApiItemToKnowledgeItem(response.data);
+        }
+      })
+      .catch(error => {
+        throw error;
+      });
+  },
   
   // Создание или обновление элемента
   save: (data: KnowledgeItem) => {

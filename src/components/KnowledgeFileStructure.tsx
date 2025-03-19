@@ -79,7 +79,13 @@ export function KnowledgeFileStructure({
             selectedItem?.id === item.id ? 'bg-blue-50 dark:bg-blue-900/20' : ''
           }`}
           style={{ paddingLeft: `${level * 1.5 + 0.5}rem` }}
-          onClick={() => item.itemType === 'file' ? onSelectItem(item) : onToggleFolder(item.id)}
+          onClick={() => {
+            if (item.itemType === 'file') {
+              onSelectItem(item);
+            } else {
+              onToggleFolder(item.id);
+            }
+          }}
           onContextMenu={(e) => onContextMenu(e, item)}
         >
           {item.itemType === 'folder' && (

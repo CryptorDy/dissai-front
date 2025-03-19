@@ -709,11 +709,21 @@ function Knowledge() {
   };
 
   const parseReels = (content: string | undefined): any[] => {
-    if (!content) return [];
+    if (!content) {
+      console.log('parseReels: content отсутствует');
+      return [];
+    }
+    
+    console.log('parseReels: Получено содержимое для парсинга:', content.substring(0, 100) + '...');
+    
     try {
-      return JSON.parse(content);
+      const parsedData = JSON.parse(content);
+      console.log('parseReels: Данные успешно распарсены, количество элементов:', 
+                  Array.isArray(parsedData) ? parsedData.length : 'не массив');
+      return parsedData;
     } catch (error) {
       console.error('Error parsing reels JSON:', error);
+      console.log('Неудачная попытка парсинга, возвращаем пустой массив');
       return [];
     }
   };
@@ -729,11 +739,16 @@ function Knowledge() {
   };
 
   const handleSelectItem = async (item: KnowledgeItem) => {
+    console.log('handleSelectItem вызван для элемента:', item);
+    
     // Если выбран элемент типа файл, загружаем его содержимое
     if (item.itemType === 'file') {
+      console.log('Выбран файл, отправляем запрос на получение содержимого для ID:', item.id);
       try {
         // Загружаем полное содержимое файла с сервера
+        console.log('Отправка запроса на GET /knowledge/file/' + item.id);
         const fullItem = await knowledgeApi.getFile(item.id);
+        console.log('Получен ответ от сервера:', fullItem);
         setSelectedItem(fullItem);
       } catch (error) {
         console.error('Error loading file content:', error);
@@ -741,6 +756,7 @@ function Knowledge() {
         showError('Ошибка при загрузке содержимого файла');
       }
     } else {
+      console.log('Выбрана папка, устанавливаем без запроса к API');
       setSelectedItem(item);
     }
     
@@ -762,6 +778,8 @@ function Knowledge() {
   };
 
   const renderContent = () => {
+    console.log('renderContent вызван, selectedItem:', selectedItem);
+    
     if (isLoading) {
       return (
         <div className="flex items-center justify-center h-full">
@@ -778,6 +796,10 @@ function Knowledge() {
         </div>
       );
     }
+
+    console.log('Отображаем содержимое для элемента:', selectedItem);
+    console.log('Тип элемента:', selectedItem.itemType, 'Тип файла:', selectedItem.fileType);
+    console.log('Содержимое файла:', selectedItem.content ? 'Присутствует' : 'Отсутствует');
 
     return (
       <div className="space-y-6">
@@ -839,7 +861,15 @@ function Knowledge() {
           </div>
         ) : selectedItem.fileType === 'reels' ? (
           <div className="p-6 max-w-7xl mx-auto">
-            <ReelsList reels={parseReels(selectedItem.content)} />
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+              {selectedItem.name}
+            </h2>
+            
+            <ReelsList 
+              reels={parseReels(selectedItem.content)} 
+              sourceId={selectedItem.id}
+              onReelsDeleted={() => loadItems()}
+            />
           </div>
         ) : selectedItem.fileType === 'content-plan' ? (
           <div className="p-6 max-w-7xl mx-auto">
