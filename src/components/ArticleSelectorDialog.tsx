@@ -66,7 +66,7 @@ export function ArticleSelectorDialog({ isOpen, onClose, onSelect, items, select
 
     const findParent = (items: KnowledgeItem[], targetId: string): boolean => {
       for (const item of items) {
-        if (item.type === 'folder' && item.children) {
+        if (item.itemType === 'folder' && item.children) {
           if (item.children.some(child => child.id === targetId)) {
             parents.push(item.id);
             return true;
@@ -104,19 +104,19 @@ export function ArticleSelectorDialog({ isOpen, onClose, onSelect, items, select
           }`}
           style={{ paddingLeft: `${level * 1.5 + 0.5}rem` }}
           onClick={() => {
-            if (item.type === 'folder') {
+            if (item.itemType === 'folder') {
               toggleFolder(item.id);
-            } else if (item.type === 'file') {
+            } else if (item.itemType === 'file') {
               onSelect(item);
             }
           }}
         >
-          {item.type === 'folder' && (
+          {item.itemType === 'folder' && (
             <ChevronRight
               className={`w-4 h-4 mr-2 transition-transform text-gray-400 dark:text-gray-300 ${isExpanded ? 'transform rotate-90' : ''}`}
             />
           )}
-          {item.type === 'folder' ? (
+          {item.itemType === 'folder' ? (
             <Folder className="w-4 h-4 mr-2 text-blue-500" />
           ) : (
             getFileIcon(item.fileType)
@@ -127,7 +127,7 @@ export function ArticleSelectorDialog({ isOpen, onClose, onSelect, items, select
             {item.name}
           </span>
         </button>
-        {item.type === 'folder' && isExpanded && item.children && (
+        {item.itemType === 'folder' && isExpanded && item.children && (
           <div>
             {item.children.map(child => renderItem(child, level + 1))}
           </div>

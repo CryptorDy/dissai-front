@@ -38,14 +38,7 @@ export function GenerationStatus() {
           break;
       }
     } 
-    // Запасной вариант - проверка IsCompleted
-    else if (apiTask.IsCompleted === true || apiTask.isCompleted === true) {
-      status = 'completed';
-    }
-    // Запасной вариант - проверка числового статуса
-    else if (apiTask.Status === 1) {
-      status = 'completed';
-    }
+
     // Запасной вариант - проверка текстового статуса с поддержкой регистронезависимости
     else if (typeof apiTask.status === 'string') {
       const statusLower = apiTask.status.toLowerCase();

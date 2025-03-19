@@ -79,15 +79,15 @@ export function KnowledgeFileStructure({
             selectedItem?.id === item.id ? 'bg-blue-50 dark:bg-blue-900/20' : ''
           }`}
           style={{ paddingLeft: `${level * 1.5 + 0.5}rem` }}
-          onClick={() => item.type === 'file' ? onSelectItem(item) : onToggleFolder(item.id)}
+          onClick={() => item.itemType === 'file' ? onSelectItem(item) : onToggleFolder(item.id)}
           onContextMenu={(e) => onContextMenu(e, item)}
         >
-          {item.type === 'folder' && (
+          {item.itemType === 'folder' && (
             <ChevronRight
               className={`w-4 h-4 mr-2 transition-transform text-gray-400 dark:text-gray-300 ${isExpanded ? 'transform rotate-90' : ''}`}
             />
           )}
-          {item.type === 'folder' ? (
+          {item.itemType === 'folder' ? (
             <Folder className="w-4 h-4 mr-2 text-blue-500" />
           ) : (
             getFileIcon(item.fileType)
@@ -115,7 +115,7 @@ export function KnowledgeFileStructure({
             <MoreVertical className="w-4 h-4 text-gray-500 dark:text-gray-400" />
           </button>
         </div>
-        {item.type === 'folder' && isExpanded && item.children && (
+        {item.itemType === 'folder' && isExpanded && item.children && (
           <div>
             {item.children.map(child => renderItem(child, level + 1))}
           </div>

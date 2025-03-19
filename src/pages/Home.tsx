@@ -83,13 +83,6 @@ function Home() {
       inDevelopment: true
     },
     {
-      id: 'chat',
-      title: 'Интеллектуальный чат',
-      icon: <MessageCircle className="w-6 h-6" />,
-      description: 'Выберите формат диалога: студент с мудрецом, дискуссия специалистов или мозговой штурм',
-      path: '/chat'
-    },
-    {
       id: 'simplify',
       title: 'Пересказ научной работы',
       icon: <FileQuestion className="w-6 h-6" />,
@@ -119,7 +112,7 @@ function Home() {
             Dissai.io
           </h1>
           <p className="text-xl text-gray-600 dark:text-gray-300">
-            Цифровая мастерская интеллектуального контента
+            Цифровая мастерская контента с искусственным интеллектом
           </p>
         </header>
 

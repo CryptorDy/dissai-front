@@ -6,6 +6,7 @@ import {
   Repeat,
   MessageSquare,
   CheckCircle,
+  Check,
   Move,
   FileText,
   Target,
@@ -127,11 +128,48 @@ export function ReelsList({ reels, sourceId, onReelsDeleted }: ReelsListProps) {
   const [items, setItems] = useState<KnowledgeItem[]>([]);
   const [normalizedReels, setNormalizedReels] = useState<Reel[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
+  // Ключ для кэша зависит от sourceId, чтобы хранить разные кэши для разных источников
+  const cacheKey = `reels_cache_${sourceId || "all"}`;
+
+  // Загрузка кэшированных данных при монтировании компонента
   useEffect(() => {
+    loadCachedReels();
     loadItems();
-    normalizeReelsData();
+  }, []);
+
+  // Обработка новых данных из props
+  useEffect(() => {
+    if (reels) {
+      normalizeReelsData();
+    }
   }, [reels]);
+
+  // Загрузка кэшированных рилсов из localStorage
+  const loadCachedReels = () => {
+    try {
+      const cachedData = localStorage.getItem(cacheKey);
+      if (cachedData) {
+        const parsedData = JSON.parse(cachedData);
+        if (Array.isArray(parsedData) && parsedData.length > 0) {
+          setNormalizedReels(parsedData);
+          setIsLoading(false);
+        }
+      }
+    } catch (error) {
+      console.error('Ошибка при загрузке кэшированных данных:', error);
+    }
+  };
+
+  // Сохранение нормализованных рилсов в localStorage
+  const saveReelsToCache = (reelsData: Reel[]) => {
+    try {
+      localStorage.setItem(cacheKey, JSON.stringify(reelsData));
+    } catch (error) {
+      console.error('Ошибка при сохранении данных в кэш:', error);
+    }
+  };
 
   const loadItems = async () => {
     try {
@@ -145,7 +183,6 @@ export function ReelsList({ reels, sourceId, onReelsDeleted }: ReelsListProps) {
   const normalizeReelsData = () => {
     try {
       if (!reels || !Array.isArray(reels)) {
-        setNormalizedReels([]);
         return;
       }
 
@@ -195,10 +232,15 @@ export function ReelsList({ reels, sourceId, onReelsDeleted }: ReelsListProps) {
         }
       }));
 
+      // Сохраняем данные в кэш после нормализации
+      if (validReels.length > 0) {
+        saveReelsToCache(validReels);
+      }
+      
       setNormalizedReels(validReels);
+      setIsLoading(false);
     } catch (error) {
       console.error('Error normalizing reels data:', error);
-      setNormalizedReels([]);
     }
   };
 
@@ -226,18 +268,16 @@ export function ReelsList({ reels, sourceId, onReelsDeleted }: ReelsListProps) {
   };
 
   const handleMove = async (targetFolderId: string | null, newFileName?: string) => {
-    if (isProcessing || !token) {
-      showError('Необходима авторизация');
-      return;
-    }
-
+    if (!sourceId) return;
+    if (selectedReels.length === 0) return;
+    
     setIsProcessing(true);
 
     try {
       const selectedReelsData = normalizedReels.filter(reel => selectedReels.includes(reel.url));
       
       const targetItem = items.find(item => item.id === targetFolderId);
-      if (targetItem && targetItem.type === 'file' && targetItem.fileType === 'reels') {
+      if (targetItem && targetItem.itemType === 'file' && targetItem.fileType === 'reels') {
         const response = await fetch(`${API_URL}/reels/move-item`, {
           method: 'POST',
           headers: {
@@ -256,14 +296,29 @@ export function ReelsList({ reels, sourceId, onReelsDeleted }: ReelsListProps) {
         }
       } else {
         const newFile: KnowledgeItem = {
-          type: 'file',
+          id: '',
+          itemType: 'file',
           fileType: 'reels',
           name: newFileName || `Reels (${selectedReelsData.length})`,
           content: JSON.stringify([]),
           parentId: targetFolderId
         };
 
-        const savedFile = await knowledgeApi.createFile(newFile);
+        // Создаем новый файл через API knowledge/save
+        const saveResponse = await fetch(`${API_URL}/knowledge/save`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(newFile)
+        });
+
+        if (!saveResponse.ok) {
+          throw new Error(`Ошибка при создании нового файла: ${saveResponse.status}`);
+        }
+
+        const savedFile = await saveResponse.json();
         
         const response = await fetch(`${API_URL}/reels/move-item`, {
           method: 'POST',
@@ -354,6 +409,17 @@ export function ReelsList({ reels, sourceId, onReelsDeleted }: ReelsListProps) {
     }
   };
 
+  if (isLoading && normalizedReels.length === 0) {
+    return (
+      <div className="p-8 flex items-center justify-center">
+        <div className="animate-pulse flex flex-col items-center">
+          <div className="h-8 w-36 bg-gray-200 dark:bg-gray-700 rounded mb-4"></div>
+          <div className="text-gray-500 dark:text-gray-400">Загрузка данных...</div>
+        </div>
+      </div>
+    );
+  }
+
   if (normalizedReels.length === 0) {
     return (
       <div className="p-8 text-center">
@@ -368,28 +434,25 @@ export function ReelsList({ reels, sourceId, onReelsDeleted }: ReelsListProps) {
         {normalizedReels.map((reel, index) => (
           <div
             key={index}
-            className={`bg-white dark:bg-gray-800 rounded-xl overflow-hidden relative ${
-              selectedReels.includes(reel.url) ? 'ring-2 ring-blue-500' : ''
+            className={`bg-white dark:bg-gray-800 rounded-xl overflow-hidden relative border border-gray-200 dark:border-gray-700 ${
+              selectedReels.includes(reel.url) 
+                ? 'ring-2 ring-blue-500' 
+                : 'hover:border-gray-300 dark:hover:border-gray-600'
             }`}
           >
             <button
               onClick={() => toggleReelSelection(reel.url)}
-              className={`absolute top-2 right-2 p-2 rounded-full transition-colors ${
+              className={`absolute top-2 right-2 p-1 rounded-md transition-colors ${
                 selectedReels.includes(reel.url)
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
+                  ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
+                  : 'bg-gray-50 dark:bg-gray-800 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
               }`}
             >
-              <CheckCircle className="w-4 h-4" />
+              <Check className="w-6 h-6" />
             </button>
 
             <div className="p-4">
-              <div className="flex items-center mb-4">
-                <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 mr-3 flex items-center justify-center overflow-hidden">
-                  <span className="text-gray-500 dark:text-gray-400 font-bold">
-                    {reel.ownerUsername?.charAt(0).toUpperCase() || 'A'}
-                  </span>
-                </div>
+              <div className="mb-4">
                 <div>
                   <a
                     href={reel.inputUrl || reel.url}
@@ -569,29 +632,31 @@ export function ReelsList({ reels, sourceId, onReelsDeleted }: ReelsListProps) {
       </div>
 
       {selectedReels.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-t-xl px-6 py-4 flex items-center gap-4">
+        <div className="fixed bottom-0 left-0 right-0 z-50 shadow-lg">
+          <div className="bg-white dark:bg-gray-800 rounded-t-xl px-6 py-4 flex items-center justify-between">
             <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
               Выбрано: {selectedReels.length}
             </span>
-            <button
-              onClick={() => setShowMoveDialog(true)}
-              disabled={isProcessing || !token}
-              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Move className="w-4 h-4 mr-2" />
-              {!token ? 'Требуется авторизация' : (isProcessing ? 'Обработка...' : 'Переместить')}
-            </button>
-            {sourceId && (
+            <div className="flex items-center gap-4">
               <button
-                onClick={() => setShowDeleteDialog(true)}
+                onClick={() => setShowMoveDialog(true)}
                 disabled={isProcessing || !token}
-                className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Trash2 className="w-4 h-4 mr-2" />
-                {!token ? 'Требуется авторизация' : (isProcessing ? 'Обработка...' : 'Удалить')}
+                <Move className="w-4 h-4 mr-2" />
+                {!token ? 'Требуется авторизация' : (isProcessing ? 'Обработка...' : 'Переместить')}
               </button>
-            )}
+              {sourceId && (
+                <button
+                  onClick={() => setShowDeleteDialog(true)}
+                  disabled={isProcessing || !token}
+                  className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  {!token ? 'Требуется авторизация' : (isProcessing ? 'Обработка...' : 'Удалить')}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -603,9 +668,10 @@ export function ReelsList({ reels, sourceId, onReelsDeleted }: ReelsListProps) {
         items={items}
         currentItem={{
           id: 'temp',
-          type: 'file',
+          itemType: 'file',
           fileType: 'reels',
-          name: 'Новый файл'
+          name: 'Новый файл',
+          parentId: null
         }}
       />
 

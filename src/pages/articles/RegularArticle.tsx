@@ -190,15 +190,16 @@ function RegularArticle() {
     
     if (targetFolderId !== undefined && fileName) {
       try {
-        const newItem = {
-          type: 'file' as const,
-          fileType: 'article' as const,
+        const newItem: KnowledgeItem = {
+          id: '',
+          type: 'file',
+          fileType: 'article',
           name: fileName,
           content,
           parentId: targetFolderId
         };
 
-        await knowledgeApi.saveItem(newItem);
+        await knowledgeApi.save(newItem);
         setShowSaveDialog(false);
       } catch (error) {
         console.error('Failed to save article:', error);

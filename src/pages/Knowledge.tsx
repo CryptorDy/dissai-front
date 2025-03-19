@@ -97,11 +97,21 @@ function Knowledge() {
 
   const loadItems = async () => {
     try {
+      console.log('Loading knowledge items...');
+      setIsLoading(true);
       const data = await knowledgeApi.getItems();
-      setItems(Array.isArray(data) ? data : []);
+      console.log('Received items:', data);
+      
+      if (Array.isArray(data) && data.length > 0) {
+        setItems(data);
+        console.log('Items set successfully');
+      } else {
+        console.warn('No items received or empty array');
+        setItems([]);
+      }
     } catch (error) {
-      showError('Ошибка при загрузке данных');
       console.error('Error loading items:', error);
+      showError('Ошибка при загрузке данных');
       setItems([]);
     } finally {
       setIsLoading(false);
@@ -125,7 +135,7 @@ function Knowledge() {
       if (item.id === itemId) {
         return path;
       }
-      if (item.type === 'folder' && item.children) {
+      if (item.itemType === 'folder' && item.children) {
         const result = findParentFolders(item.children, itemId, [...path, item.id]);
         if (result.length > 0) {
           return result;
@@ -147,7 +157,7 @@ function Knowledge() {
       setItems(prev => {
         const newFile: KnowledgeItem = {
           id: tempId,
-          type: 'file',
+          itemType: 'file',
           fileType: type === 'empty' ? 'article' : type,
           name: defaultName,
           parentId: parentId || null
@@ -207,10 +217,10 @@ function Knowledge() {
         return;
     }
 
-    createFile(type, 'Новый файл', parentId);
+    saveFile(type, 'Новый файл', parentId);
   };
 
-  const createFile = async (type: string, fileName: string, parentId?: string) => {
+  const saveFile = async (type: string, fileName: string, parentId?: string) => {
     try {
       let content = '';
       
@@ -223,9 +233,10 @@ function Knowledge() {
         content = `### План развития: ${fileName}\n\n- **Первый этап** [deadline: ${new Date().toISOString().split('T')[0]}]:\n  Описание первого этапа\n\n- **Второй этап**:\n  Описание второго этапа`;
       }
 
+      // Создаем новый файл
       const newFile: KnowledgeItem = {
-        id: Date.now().toString(),
-        type: 'file',
+        id: '',
+        itemType: 'file',
         fileType: type === 'empty' ? 'article' : type,
         name: fileName,
         content: content,
@@ -233,7 +244,7 @@ function Knowledge() {
         metadata: type === 'roadmap-item' ? { completedTasks: [] } : undefined
       };
 
-      const createdFile = await knowledgeApi.createFile(newFile);
+      const createdFile = await knowledgeApi.save(newFile);
       
       // Если файл создается в папке, убедимся, что папка раскрыта
       if (parentId) {
@@ -319,7 +330,12 @@ function Knowledge() {
         
         // Если ID начинается с "temp-", создаем новый файл
         if (selectedItem.id.startsWith('temp-')) {
-          const createdItem = await knowledgeApi.createFile(newItem);
+          // Создаем новый файл через save
+          const itemToSave = {
+            ...newItem,
+            id: ''
+          };
+          const createdItem = await knowledgeApi.save(itemToSave);
           
           // Если файл создается в папке, убедимся, что папка раскрыта
           if (targetFolderId) {
@@ -402,56 +418,61 @@ function Knowledge() {
   };
 
   const addNewFolder = (parentId?: string) => {
-    // Создаем временный ID для новой папки
-    const tempId = `temp-${Date.now()}`;
-    
-    // Если указан parentId, убедимся, что родительская папка раскрыта
-    if (parentId) {
-      setExpandedFolders(prev => {
-        if (!prev.includes(parentId)) {
-          return [...prev, parentId];
+    // Создаем новую папку сразу через API
+    const newFolder: KnowledgeItem = {
+      id: '',
+      itemType: 'folder',
+      name: 'Новая папка',
+      children: [],
+      parentId: parentId || null
+    };
+
+    // Отправляем на сервер
+    knowledgeApi.save(newFolder)
+      .then(createdFolder => {
+        // Если указан parentId, убедимся, что родительская папка раскрыта
+        if (parentId) {
+          setExpandedFolders(prev => {
+            if (!prev.includes(parentId)) {
+              return [...prev, parentId];
+            }
+            return prev;
+          });
         }
-        return prev;
-      });
-    }
-    
-    // Добавляем временную папку в состояние с правильным типом
-    setItems(prev => {
-      const newFolder: KnowledgeItem = {
-        id: tempId,
-        type: 'folder', // Тип всегда должен быть 'folder'
-        name: 'Новая папка',
-        children: [],
-        parentId: parentId || null
-      };
-
-      if (!parentId) {
-        return [...prev, newFolder];
-      }
-
-      const addToParent = (items: KnowledgeItem[]): KnowledgeItem[] => {
-        return items.map(item => {
-          if (item.id === parentId) {
-            return {
-              ...item,
-              children: [...(item.children || []), newFolder]
-            };
+        
+        // Добавляем созданную папку в состояние
+        setItems(prev => {
+          if (!parentId) {
+            return [...prev, createdFolder];
           }
-          if (item.children) {
-            return {
-              ...item,
-              children: addToParent(item.children)
-            };
-          }
-          return item;
+
+          const addToParent = (items: KnowledgeItem[]): KnowledgeItem[] => {
+            return items.map(item => {
+              if (item.id === parentId) {
+                return {
+                  ...item,
+                  children: [...(item.children || []), createdFolder]
+                };
+              }
+              if (item.children) {
+                return {
+                  ...item,
+                  children: addToParent(item.children)
+                };
+              }
+              return item;
+            });
+          };
+          return addToParent(prev);
         });
-      };
-      return addToParent(prev);
-    });
 
-    // Включаем режим редактирования для новой папки
-    setIsEditing(tempId);
-    setEditName('Новая папка');
+        // Включаем режим редактирования для новой папки
+        setIsEditing(createdFolder.id);
+        setEditName('Новая папка');
+      })
+      .catch(error => {
+        showError('Ошибка при создании папки');
+      });
   };
 
   const handleSaveEdit = async (item: KnowledgeItem) => {
@@ -467,7 +488,7 @@ function Knowledge() {
         // Создаем новый файл
         let content = '';
         
-        // Устанавливаем началь ное содержимое в зависимости от типа файла
+        // Устанавливаем начальное содержимое в зависимости от типа файла
         if (newFileType === 'empty') {
           content = `# ${editName}\n\nНачните писать здесь...`;
         } else if (newFileType === 'roadmap-item') {
@@ -475,7 +496,8 @@ function Knowledge() {
         }
         
         const newFile: KnowledgeItem = {
-          type: 'file',
+          id: '',
+          itemType: 'file',
           fileType: newFileType === 'empty' ? 'article' : newFileType,
           name: editName.trim(),
           content: content,
@@ -483,10 +505,17 @@ function Knowledge() {
           metadata: newFileType === 'roadmap-item' ? { completedTasks: [] } : undefined
         };
         
-        savedItem = await knowledgeApi.createFile(newFile);
+        savedItem = await knowledgeApi.save(newFile);
       } else if (isNewItem) {
         // Создаем новую папку
-        savedItem = await knowledgeApi.createFolder(editName.trim(), item.parentId);
+        const newFolder: KnowledgeItem = {
+          id: '',
+          itemType: 'folder',
+          name: editName.trim(),
+          children: [],
+          parentId: item.parentId
+        };
+        savedItem = await knowledgeApi.save(newFolder);
       } else {
         // Обновляем существующий элемент
         const updatedItem = {
@@ -504,7 +533,7 @@ function Knowledge() {
               // Важно: сохраняем тип элемента при обновлении
               return {
                 ...savedItem,
-                type: isNewItem && !isNewFile ? 'folder' : savedItem.type || i.type
+                itemType: isNewItem && !isNewFile ? 'folder' : savedItem.itemType || i.itemType
               };
             }
             if (i.children) {
@@ -549,11 +578,12 @@ function Knowledge() {
     setNewFileType('');
   };
 
-  const moveItem = async (targetFolderId: string | null) => {
+  const handleMoveItem = async (targetFolderId: string | null) => {
     if (!moveDialogItem) return;
+    setMoveDialogItem(null);
 
     try {
-      await knowledgeApi.moveItem(moveDialogItem.id, targetFolderId);
+      await knowledgeApi.moveItem(moveDialogItem.id, targetFolderId, moveDialogItem.itemType);
       
       // Если перемещаем в папку, убедимся, что она раскрыта
       if (targetFolderId) {
@@ -564,52 +594,13 @@ function Knowledge() {
           return prev;
         });
       }
-      
-      setItems(prev => {
-        let itemToMove: KnowledgeItem | undefined;
-        const removeItem = (items: KnowledgeItem[]): KnowledgeItem[] => {
-          return items.filter(i => {
-            if (i.id === moveDialogItem.id) {
-              itemToMove = { ...i };
-              return false;
-            }
-            if (i.children) {
-              i.children = removeItem(i.children);
-            }
-            return true;
-          });
-        };
-        let newItems = removeItem(prev);
 
-        if (!itemToMove) return prev;
-
-        if (!targetFolderId) {
-          newItems = [...newItems, { ...itemToMove, parentId: null }];
-        } else {
-          const addToFolder = (items: KnowledgeItem[]): KnowledgeItem[] => {
-            return items.map(i => {
-              if (i.id === targetFolderId) {
-                return {
-                  ...i,
-                  children: [...(i.children || []), { ...itemToMove!, parentId: i.id }]
-                };
-              }
-              if (i.children) {
-                return { ...i, children: addToFolder(i.children) };
-              }
-              return i;
-            });
-          };
-          newItems = addToFolder(newItems);
-        }
-
-        return newItems;
-      });
+      // Обновляем список после перемещения
+      loadItems();
     } catch (error) {
-      showError('Ошибка при перемещении');
+      console.error('Error moving item:', error);
+      showError('Ошибка при перемещении элемента');
     }
-
-    setMoveDialogItem(null);
   };
 
   const handleContextMenu = (e: React.MouseEvent, item: KnowledgeItem) => {
@@ -640,30 +631,38 @@ function Knowledge() {
 
   const confirmDelete = async () => {
     if (!itemToDelete) return;
-
+    
     try {
-      await knowledgeApi.deleteItem(itemToDelete.id, itemToDelete.type === 'folder');
+      await knowledgeApi.deleteItem(itemToDelete.id);
       setItems(prev => {
         const removeItem = (items: KnowledgeItem[]): KnowledgeItem[] => {
-          return items.filter(i => {
-            if (i.id === itemToDelete.id) return false;
-            if (i.children) {
-              i.children = removeItem(i.children);
+          return items.filter(item => {
+            if (item.id === itemToDelete.id) {
+              return false;
             }
+            
+            if (item.children) {
+              item.children = removeItem(item.children);
+            }
+            
             return true;
           });
         };
+        
         return removeItem(prev);
       });
-      if (selectedItem?.id === itemToDelete.id) {
+      
+      // Если удаляемый элемент был выбран, сбрасываем выбор
+      if (selectedItem && selectedItem.id === itemToDelete.id) {
         setSelectedItem(null);
       }
+      
+      setShowDeleteDialog(false);
+      setItemToDelete(null);
     } catch (error) {
-      showError('Ошибка при удалении');
+      console.error('Error deleting item:', error);
+      showError('Ошибка при удалении элемента');
     }
-
-    setShowDeleteDialog(false);
-    setItemToDelete(null);
   };
 
   const parseMessages = (content: string): ChatMessage[] => {
@@ -731,7 +730,7 @@ function Knowledge() {
 
   const handleSelectItem = async (item: KnowledgeItem) => {
     // Если выбран элемент типа файл, загружаем его содержимое
-    if (item.type === 'file') {
+    if (item.itemType === 'file') {
       try {
         // Загружаем полное содержимое файла с сервера
         const fullItem = await knowledgeApi.getFile(item.id);
@@ -782,7 +781,7 @@ function Knowledge() {
 
     return (
       <div className="space-y-6">
-        {selectedItem.type !== 'folder' && !isChatOpen && (
+        {selectedItem.itemType !== 'folder' && !isChatOpen && (
           <div className="flex justify-center mt-8">
             <button
               onClick={() => setIsChatOpen(true)}
@@ -794,7 +793,7 @@ function Knowledge() {
           </div>
         )}
 
-        {isChatOpen && selectedItem.type !== 'folder' && (
+        {isChatOpen && selectedItem.itemType !== 'folder' && (
           <KnowledgeChat
             isOpen={isChatOpen}
             onClose={() => setIsChatOpen(false)}
@@ -804,7 +803,7 @@ function Knowledge() {
           />
         )}
 
-        {selectedItem.type === 'folder' ? (
+        {selectedItem.itemType === 'folder' ? (
           <div className="p-6 max-w-6xl mx-auto">
             <div className="prose dark:prose-invert max-w-none">
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -902,7 +901,7 @@ function Knowledge() {
       <MoveDialog
         isOpen={moveDialogItem !== null}
         onClose={() => setMoveDialogItem(null)}
-        onMove={moveItem}
+        onMove={handleMoveItem}
         items={items}
         currentItem={moveDialogItem!}
       />
@@ -917,7 +916,7 @@ function Knowledge() {
             className="fixed bg-white dark:bg-gray-800 rounded-lg shadow-lg py-2 z-50"
             style={{ left: contextMenu.x, top: contextMenu.y }}
           >
-            {contextMenu.item.type === 'folder' && (
+            {contextMenu.item.itemType === 'folder' && (
               <>
                 <button
                   onClick={() => {
@@ -982,7 +981,7 @@ function Knowledge() {
             </div>
             <p className="text-gray-600 dark:text-gray-300 mb-6">
               Вы уверены, что хотите удалить "{itemToDelete.name}"?
-              {itemToDelete.type === 'folder' && (
+              {itemToDelete.itemType === 'folder' && (
                 <span className="block mt-2 text-red-500 text-sm">
                   Внимание: все файлы внутри папки также будут удалены!
                 </span>
