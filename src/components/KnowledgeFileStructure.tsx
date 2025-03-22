@@ -1,7 +1,5 @@
 import React, { useEffect, useRef } from 'react';
 import { 
-  Folder, 
-  FileText, 
   ChevronRight, 
   MoreVertical, 
   FilePlus,
@@ -12,7 +10,9 @@ import {
   FileQuestion,
   MessageCircle,
   Instagram,
-  Calendar
+  Calendar,
+  FileIcon,
+  FolderIcon
 } from 'lucide-react';
 import { KnowledgeItem } from '../services/api';
 
@@ -60,23 +60,23 @@ export function KnowledgeFileStructure({
   const getFileIcon = (fileType?: string) => {
     switch (fileType) {
       case 'article':
-        return <FileText className="w-4 h-4 mr-2 text-blue-500" />;
+        return <FileIcon className="w-4 h-4 mr-2 text-blue-500" strokeWidth={1.5} />;
       case 'educational':
-        return <GraduationCap className="w-4 h-4 mr-2 text-green-500" />;
+        return <GraduationCap className="w-4 h-4 mr-2 text-green-500" strokeWidth={1.5} />;
       case 'notes':
-        return <BookOpen className="w-4 h-4 mr-2 text-purple-500" />;
+        return <BookOpen className="w-4 h-4 mr-2 text-purple-500" strokeWidth={1.5} />;
       case 'roadmap-item':
-        return <Target className="w-4 h-4 mr-2 text-orange-500" />;
+        return <Target className="w-4 h-4 mr-2 text-orange-500" strokeWidth={1.5} />;
       case 'chat':
-        return <MessageCircle className="w-4 h-4 mr-2 text-pink-500" />;
+        return <MessageCircle className="w-4 h-4 mr-2 text-pink-500" strokeWidth={1.5} />;
       case 'simplify':
-        return <FileQuestion className="w-4 h-4 mr-2 text-red-500" />;
+        return <FileQuestion className="w-4 h-4 mr-2 text-red-500" strokeWidth={1.5} />;
       case 'reels':
-        return <Instagram className="w-4 h-4 mr-2 text-rose-500" />;
+        return <Instagram className="w-4 h-4 mr-2 text-rose-500" strokeWidth={1.5} />;
       case 'content-plan':
-        return <Calendar className="w-4 h-4 mr-2 text-teal-500" />;
+        return <Calendar className="w-4 h-4 mr-2 text-teal-500" strokeWidth={1.5} />;
       default:
-        return <FileText className="w-4 h-4 mr-2 text-gray-500" />;
+        return <FileIcon className="w-4 h-4 mr-2 text-gray-500" strokeWidth={1.5} />;
     }
   };
 
@@ -113,12 +113,15 @@ export function KnowledgeFileStructure({
         >
           {/* Отображаем стрелку раскрытия для папок и файлов с дочерними элементами */}
           {(item.itemType === 'folder' || hasChildren) && (
-            <ChevronRight
-              className={`w-4 h-4 mr-2 transition-transform text-gray-400 dark:text-gray-300 ${isExpanded ? 'transform rotate-90' : ''}`}
-            />
+            <div className="relative flex items-center justify-center w-5 mr-1">
+              <ChevronRight
+                className={`w-4 h-4 transition-transform text-gray-400 dark:text-gray-300 ${isExpanded ? 'transform rotate-90' : ''}`}
+                strokeWidth={1.5}
+              />
+            </div>
           )}
           {item.itemType === 'folder' ? (
-            <Folder className="w-4 h-4 mr-2 text-blue-500" />
+            <FolderIcon className="w-4 h-4 mr-2 text-blue-500" strokeWidth={1.5} />
           ) : (
             getFileIcon(item.fileType)
           )}
@@ -142,9 +145,9 @@ export function KnowledgeFileStructure({
               e.stopPropagation();
               onContextMenu(e, item);
             }}
-            className="opacity-0 group-hover:opacity-100 hover:bg-gray-200 dark:hover:bg-gray-600 p-1 rounded-full transition-opacity"
+            className="opacity-0 group-hover:opacity-100 hover:bg-gray-200 dark:hover:bg-gray-600 p-1.5 rounded-full transition-all"
           >
-            <MoreVertical className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+            <MoreVertical className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" strokeWidth={1.5} />
           </button>
         </div>
         {/* Отображаем дочерние элементы для папок и файлов, если они есть и раскрыты */}
@@ -165,15 +168,15 @@ export function KnowledgeFileStructure({
           <div className="flex items-center space-x-2">
             <button
               onClick={onAddFile}
-              className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
+              className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
             >
-              <FilePlus className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+              <FilePlus className="w-5 h-5 text-blue-500 dark:text-blue-400" strokeWidth={1.5} />
             </button>
             <button
               onClick={onAddFolder}
-              className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
+              className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
             >
-              <FolderPlus className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+              <FolderPlus className="w-5 h-5 text-blue-500 dark:text-blue-400" strokeWidth={1.5} />
             </button>
           </div>
         </div>

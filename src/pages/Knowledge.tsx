@@ -683,7 +683,6 @@ function Knowledge() {
             });
           }
         } catch (error) {
-          showError('Произошла ошибка при сохранении файла на сервере. Данные могут быть потеряны при обновлении страницы.');
         }
         
         setNewFileType('');
@@ -905,9 +904,26 @@ function Knowledge() {
 
   const handleContextMenu = (e: React.MouseEvent, item: KnowledgeItem) => {
     e.preventDefault();
+    
+    // Определяем размеры экрана и положение меню
+    const windowHeight = window.innerHeight;
+    const windowWidth = window.innerWidth;
+    const menuHeight = 220; // Примерная высота меню
+    const menuWidth = 180;  // Примерная ширина меню
+    
+    // Если меню выходит за нижнюю границу экрана, поднимаем его выше
+    const yPosition = e.clientY + menuHeight > windowHeight 
+      ? windowHeight - menuHeight - 10 // Отступ 10px от низа экрана
+      : e.clientY;
+    
+    // Если меню выходит за правую границу экрана, смещаем его влево
+    const xPosition = e.clientX + menuWidth > windowWidth
+      ? windowWidth - menuWidth - 10 // Отступ 10px от правого края
+      : e.clientX;
+    
     setContextMenu({
-      x: e.clientX,
-      y: e.clientY,
+      x: xPosition,
+      y: yPosition,
       item
     });
   };
@@ -1227,10 +1243,11 @@ function Knowledge() {
         {contextMenu && (
           <motion.div
             ref={contextMenuRef}
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="fixed bg-white dark:bg-gray-800 rounded-lg shadow-lg py-2 z-50"
+            initial={{ opacity: 0, scale: 0.95, y: 5 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 5 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
+            className="fixed bg-white dark:bg-gray-800 rounded-xl shadow-lg py-2 z-50 border border-gray-200 dark:border-gray-600 ring-1 ring-black/5 dark:ring-white/10 backdrop-blur-sm"
             style={{ left: contextMenu.x, top: contextMenu.y }}
           >
             <button
@@ -1239,9 +1256,9 @@ function Knowledge() {
                 setShowNewArticleDialog(true);
                 setContextMenu(null);
               }}
-              className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center text-gray-900 dark:text-white"
+              className="w-full px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center text-gray-900 dark:text-white transition-all"
             >
-              <FileText className="w-4 h-4 mr-2" />
+              <FileText className="w-4 h-4 mr-2 text-blue-500" />
               Новый файл
             </button>
             <button
@@ -1249,28 +1266,28 @@ function Knowledge() {
                 addNewFolder(contextMenu.item.id);
                 setContextMenu(null);
               }}
-              className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center text-gray-900 dark:text-white"
+              className="w-full px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center text-gray-900 dark:text-white transition-all"
             >
-              <FolderPlus className="w-4 h-4 mr-2" />
+              <FolderPlus className="w-4 h-4 mr-2 text-blue-500" />
               Новая папка
             </button>
             <button
               onClick={() => handleEdit(contextMenu.item)}
-              className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center text-gray-900 dark:text-white"
+              className="w-full px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center text-gray-900 dark:text-white transition-all"
             >
-              <Edit2 className="w-4 h-4 mr-2" />
+              <Edit2 className="w-4 h-4 mr-2 text-blue-500" />
               Переименовать
             </button>
             <button
               onClick={() => handleMove(contextMenu.item)}
-              className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center text-gray-900 dark:text-white"
+              className="w-full px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center text-gray-900 dark:text-white transition-all"
             >
-              <Move className="w-4 h-4 mr-2" />
+              <Move className="w-4 h-4 mr-2 text-blue-500" />
               Переместить
             </button>
             <button
               onClick={() => handleDelete(contextMenu.item)}
-              className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center text-red-500"
+              className="w-full px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center text-red-500 transition-all"
             >
               <Trash2 className="w-4 h-4 mr-2" />
               Удалить
@@ -1280,13 +1297,14 @@ function Knowledge() {
       </AnimatePresence>
 
       {showDeleteDialog && itemToDelete && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
           <motion.div
             ref={deleteDialogRef}
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.9, opacity: 0 }}
-            className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-sm w-full mx-4"
+            initial={{ scale: 0.95, opacity: 0, y: 10 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.95, opacity: 0, y: 10 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-sm w-full mx-4 shadow-xl border border-gray-200 dark:border-gray-600 ring-1 ring-black/5 dark:ring-white/10"
           >
             <div className="flex items-center mb-4 text-red-500">
               <Trash2 className="w-6 h-6 mr-2" />
@@ -1306,13 +1324,13 @@ function Knowledge() {
                   setShowDeleteDialog(false);
                   setItemToDelete(null);
                 }}
-                className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700  rounded"
+                className="px-4 py-2 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-all"
               >
                 Отмена
               </button>
               <button
                 onClick={confirmDelete}
-                className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+                className="px-4 py-2 bg-red-500/90 hover:bg-red-500 text-white rounded-lg shadow-sm hover:shadow transition-all"
               >
                 Удалить
               </button>
