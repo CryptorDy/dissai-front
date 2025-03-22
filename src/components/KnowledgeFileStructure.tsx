@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { 
   Folder, 
   FileText, 
@@ -45,6 +45,18 @@ export function KnowledgeFileStructure({
   onAddFile,
   onAddFolder
 }: KnowledgeFileStructureProps) {
+  // Ссылка на инпут, чтобы сфокусироваться на нем при появлении
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Эффект для фокуса на инпуте при редактировании
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      // Выделяем весь текст при фокусе
+      inputRef.current.select();
+    }
+  }, [isEditing]);
+
   const getFileIcon = (fileType?: string) => {
     switch (fileType) {
       case 'article':
@@ -69,8 +81,16 @@ export function KnowledgeFileStructure({
   };
 
   const renderItem = (item: KnowledgeItem, level = 0) => {
+    // Защита от ошибок с undefined id
+    if (!item || !item.id) {
+      console.warn('Элемент без id в списке файлов:', item);
+      return null;
+    }
+    
     const isExpanded = expandedFolders.includes(item.id);
     const isItemEditing = isEditing === item.id;
+    const isTemporary = item.id.startsWith('temp-');
+    const displayName = (isTemporary && !item.name) ? "Новый файл" : (item.name || "Новый файл");
 
     return (
       <React.Fragment key={item.id}>
@@ -100,16 +120,18 @@ export function KnowledgeFileStructure({
           )}
           {isItemEditing ? (
             <input
+              ref={inputRef}
               type="text"
               value={editName}
               onChange={(e) => onEditNameChange(e.target.value)}
               onBlur={() => onEditSave(item)}
               onKeyDown={(e) => e.key === 'Enter' && onEditSave(item)}
               className="flex-1 bg-white dark:bg-gray-800 px-2 py-1 rounded border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
+              placeholder="Введите имя файла"
               autoFocus
             />
           ) : (
-            <span className="flex-1 text-gray-900 dark:text-white">{item.name}</span>
+            <span className="flex-1 text-gray-900 dark:text-white">{displayName}</span>
           )}
           <button
             onClick={(e) => {
@@ -123,7 +145,7 @@ export function KnowledgeFileStructure({
         </div>
         {item.itemType === 'folder' && isExpanded && item.children && (
           <div>
-            {item.children.map(child => renderItem(child, level + 1))}
+            {item.children.filter(child => child && child.id).map(child => renderItem(child, level + 1))}
           </div>
         )}
       </React.Fragment>
@@ -153,7 +175,7 @@ export function KnowledgeFileStructure({
       </div>
       <div className="flex-1 overflow-y-auto p-4">
         <div className="space-y-1">
-          {Array.isArray(items) && items.map(item => renderItem(item))}
+          {Array.isArray(items) && items.filter(item => item && item.id).map(item => renderItem(item))}
         </div>
       </div>
     </div>

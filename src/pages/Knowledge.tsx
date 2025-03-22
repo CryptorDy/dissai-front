@@ -151,20 +151,31 @@ function Knowledge() {
     // Для пустой статьи и roadmap создаем временный файл и сразу включаем режим редактирования
     if (type === 'empty' || type === 'roadmap-item') {
       const tempId = `temp-file-${Date.now()}`;
-      const defaultName = type === 'empty' ? 'Новая статья' : 'Новый план';
+      const defaultName = ''; // Пустое имя, чтобы поле ввода было пустым
+      
+      // Создаем содержимое файла сразу
+      let content = '';
+      if (type === 'empty') {
+        content = `# ${defaultName}\n\nНачните писать здесь...`;
+      } else if (type === 'roadmap-item') {
+        content = `### План развития: ${defaultName}\n\n- **Первый этап** [deadline: ${new Date().toISOString().split('T')[0]}]:\n  Описание первого этапа\n\n- **Второй этап**:\n  Описание второго этапа`;
+      }
+      
+      // Создаем временный файл с содержимым для немедленного отображения
+      const tempFile: KnowledgeItem = {
+        id: tempId,
+        itemType: 'file',
+        fileType: type === 'empty' ? 'article' : type,
+        name: defaultName,
+        content: content,
+        parentId: parentId || null,
+        metadata: type === 'roadmap-item' ? { completedTasks: [] } : undefined
+      };
       
       // Добавляем временный файл в состояние
       setItems(prev => {
-        const newFile: KnowledgeItem = {
-          id: tempId,
-          itemType: 'file',
-          fileType: type === 'empty' ? 'article' : type,
-          name: defaultName,
-          parentId: parentId || null
-        };
-
         if (!parentId) {
-          return [...prev, newFile];
+          return [...prev, tempFile];
         }
 
         const addToParent = (items: KnowledgeItem[]): KnowledgeItem[] => {
@@ -176,7 +187,7 @@ function Knowledge() {
               }
               return {
                 ...item,
-                children: [...(item.children || []), newFile]
+                children: [...(item.children || []), tempFile]
               };
             }
             if (item.children) {
@@ -191,10 +202,15 @@ function Knowledge() {
         return addToParent(prev);
       });
 
+      // Сразу выбираем временный файл для отображения и работы с ним
+      setSelectedItem(tempFile);
+      
       // Включаем режим редактирования для нового файла
       setIsEditing(tempId);
       setEditName(defaultName);
       setNewFileType(type);
+      
+      // Здесь мы не отправляем запрос на сервер - это будет сделано после ввода имени
       return;
     }
 
@@ -477,36 +493,189 @@ function Knowledge() {
 
   const handleSaveEdit = async (item: KnowledgeItem) => {
     if (!editName.trim() || !isEditing) return;
+    
+    // Проверяем наличие ID у элемента
+    if (!item || !item.id) {
+      console.error('Попытка сохранить элемент без ID:', item);
+      showError('Ошибка при сохранении: элемент не имеет идентификатора');
+      setIsEditing(null);
+      return;
+    }
 
     try {
       // Если ID начинается с temp-, значит это новый элемент
       const isNewItem = item.id.startsWith('temp-');
       const isNewFile = item.id.startsWith('temp-file-');
       
-      let savedItem;
+      // Если это временный файл без имени, то создаем имя и отправляем на сервер
       if (isNewFile) {
-        // Создаем новый файл
-        let content = '';
+        // Сначала обновляем локальное состояние для быстрого отображения
+        const updatedName = editName.trim();
         
-        // Устанавливаем начальное содержимое в зависимости от типа файла
-        if (newFileType === 'empty') {
-          content = `# ${editName}\n\nНачните писать здесь...`;
-        } else if (newFileType === 'roadmap-item') {
-          content = `### План развития: ${editName}\n\n- **Первый этап** [deadline: ${new Date().toISOString().split('T')[0]}]:\n  Описание первого этапа\n\n- **Второй этап**:\n  Описание второго этапа`;
+        // Обновляем содержимое при необходимости
+        let updatedContent = item.content || '';
+        if (newFileType === 'empty' && item.content) {
+          // Если это был новый файл с заглушкой имени, обновляем имя в содержимом
+          updatedContent = item.content.replace(/^# .*$/m, `# ${updatedName}`);
+        } else if (newFileType === 'roadmap-item' && item.content) {
+          // Если это был план развития, обновляем имя в содержимом
+          updatedContent = item.content.replace(/^### План развития: .*$/m, `### План развития: ${updatedName}`);
         }
         
-        const newFile: KnowledgeItem = {
-          id: '',
-          itemType: 'file',
-          fileType: newFileType === 'empty' ? 'article' : newFileType,
-          name: editName.trim(),
-          content: content,
-          parentId: item.parentId,
-          metadata: newFileType === 'roadmap-item' ? { completedTasks: [] } : undefined
+        // Временно обновляем состояние для мгновенного отображения
+        const updatedTempItem = {
+          ...item,
+          name: updatedName,
+          content: updatedContent
         };
         
-        savedItem = await knowledgeApi.save(newFile);
-      } else if (isNewItem) {
+        // Обновляем локальное состояние без ожидания ответа от сервера
+        setItems(prev => {
+          const updateItem = (items: KnowledgeItem[]): KnowledgeItem[] => {
+            return items.map(i => {
+              if (i.id === item.id) {
+                // Обновляем выбранный файл, если он совпадает с редактируемым
+                if (selectedItem?.id === item.id) {
+                  setSelectedItem(updatedTempItem);
+                }
+                return updatedTempItem;
+              }
+              if (i.children) {
+                return { ...i, children: updateItem(i.children) };
+              }
+              return i;
+            });
+          };
+          return updateItem(prev);
+        });
+        
+        // Выходим из режима редактирования
+        setIsEditing(null);
+        
+        // Асинхронно сохраняем файл на сервере
+        try {
+          // Создаем объект для сохранения на сервере
+          const newFile: KnowledgeItem = {
+            id: '',
+            itemType: 'file',
+            fileType: newFileType === 'empty' ? 'article' : newFileType,
+            name: updatedName,
+            content: updatedContent,
+            parentId: item.parentId,
+            metadata: newFileType === 'roadmap-item' ? { completedTasks: [] } : undefined
+          };
+          
+          // Отправляем запрос на сервер без блокировки интерфейса
+          const savedItem = await knowledgeApi.save(newFile);
+          console.log('Файл сохранен на сервере:', savedItem);
+          
+          // Получаем текущий временный ID файла
+          const tempId = item.id;
+          
+          // Даже если сервер вернул некорректный ответ, продолжаем работу с файлом
+          let resultItemData: KnowledgeItem;
+          
+          if (!savedItem || !savedItem.id) {
+            console.error('Сервер вернул некорректный ответ без ID:', savedItem);
+            // Не показываем пользователю сообщение, чтобы не прерывать его работу
+            // showError('Предупреждение: сервер вернул некорректные данные. Файл доступен локально, но может быть потерян при обновлении страницы.');
+            
+            // Создаем локальную версию файла для продолжения работы
+            resultItemData = {
+              ...newFile,
+              id: tempId, // Используем существующий временный ID
+              name: updatedName,
+              content: updatedContent
+            };
+          } else {
+            // Сервер вернул нормальный ответ
+            resultItemData = {
+              ...savedItem,
+              name: updatedName,
+              content: updatedContent
+            };
+          }
+          
+          // После получения ответа обновляем ID файла
+          setItems(prev => {
+            // Подход аналогичный созданию папки - удаляем временный файл и добавляем новый
+            const parentId = item.parentId;
+            
+            // Сначала удаляем временный элемент
+            const removeTemp = (items: KnowledgeItem[]): KnowledgeItem[] => {
+              return items.filter(i => {
+                if (i.id === tempId) return false;
+                if (i.children) {
+                  i.children = removeTemp(i.children);
+                }
+                return true;
+              });
+            };
+            
+            let updatedItems = removeTemp(prev);
+            
+            // Используем полностью подготовленный объект результата
+            
+            // Обновляем выбранный файл
+            if (selectedItem?.id === tempId) {
+              setSelectedItem(resultItemData);
+              
+              // Если файл в папке, убедимся, что папка раскрыта
+              if (parentId) {
+                setExpandedFolders(prev => {
+                  if (!prev.includes(parentId)) {
+                    return [...prev, parentId];
+                  }
+                  return prev;
+                });
+              }
+              
+              // Включаем режим редактирования содержимого сразу после сохранения имени
+              if (newFileType === 'empty' || newFileType === 'roadmap-item') {
+                setTimeout(() => {
+                  setEditableContent(resultItemData.content || '');
+                  setIsEditingContent(true);
+                }, 100);
+              }
+            }
+            
+            // Затем добавляем новый элемент с реальным ID
+            if (!parentId) {
+              // Если нет родителя, добавляем в корень
+              return [...updatedItems, resultItemData];
+            } else {
+              // Если есть родитель, добавляем к соответствующей папке
+              const addToParent = (items: KnowledgeItem[]): KnowledgeItem[] => {
+                return items.map(i => {
+                  if (i.id === parentId) {
+                    return {
+                      ...i,
+                      children: [...(i.children || []), resultItemData]
+                    };
+                  }
+                  if (i.children) {
+                    return {
+                      ...i,
+                      children: addToParent(i.children)
+                    };
+                  }
+                  return i;
+                });
+              };
+              return addToParent(updatedItems);
+            }
+          });
+        } catch (error) {
+          console.error('Ошибка при сохранении файла на сервере:', error);
+          showError('Файл сохранен локально, но произошла ошибка при сохранении на сервере. Данные могут быть потеряны при обновлении страницы.');
+        }
+        
+        setNewFileType('');
+        return;
+      }
+      
+      let savedItem;
+      if (isNewItem) {
         // Создаем новую папку
         const newFolder: KnowledgeItem = {
           id: '',
@@ -527,32 +696,78 @@ function Knowledge() {
 
       // Обновляем состояние
       setItems(prev => {
-        const updateItem = (items: KnowledgeItem[]): KnowledgeItem[] => {
-          return items.map(i => {
-            if (i.id === item.id) {
-              // Важно: сохраняем тип элемента при обновлении
-              return {
-                ...savedItem,
-                itemType: isNewItem && !isNewFile ? 'folder' : savedItem.itemType || i.itemType
-              };
-            }
-            if (i.children) {
-              return {
-                ...i,
-                children: updateItem(i.children)
-              };
-            }
-            return i;
-          });
-        };
-        return updateItem(prev);
+        if (isNewItem) {
+          // Для новых элементов: удаляем временный элемент и добавляем новый с правильным ID
+          const tempId = item.id;
+          const parentId = item.parentId;
+          
+          // Сначала удаляем временный элемент
+          const removeTemp = (items: KnowledgeItem[]): KnowledgeItem[] => {
+            return items.filter(i => {
+              if (i.id === tempId) return false;
+              if (i.children) {
+                i.children = removeTemp(i.children);
+              }
+              return true;
+            });
+          };
+          
+          let updatedItems = removeTemp(prev);
+          
+          // Затем добавляем новый элемент с реальным ID
+          if (!parentId) {
+            // Если нет родителя, добавляем в корень
+            return [...updatedItems, savedItem];
+          } else {
+            // Если есть родитель, добавляем к соответствующей папке
+            const addToParent = (items: KnowledgeItem[]): KnowledgeItem[] => {
+              return items.map(i => {
+                if (i.id === parentId) {
+                  return {
+                    ...i,
+                    children: [...(i.children || []), savedItem]
+                  };
+                }
+                if (i.children) {
+                  return {
+                    ...i,
+                    children: addToParent(i.children)
+                  };
+                }
+                return i;
+              });
+            };
+            return addToParent(updatedItems);
+          }
+        } else {
+          // Для обновления существующих элементов используем старую логику
+          const updateItem = (items: KnowledgeItem[]): KnowledgeItem[] => {
+            return items.map(i => {
+              if (i.id === item.id) {
+                return {
+                  ...savedItem,
+                  itemType: savedItem.itemType || i.itemType
+                };
+              }
+              if (i.children) {
+                return {
+                  ...i,
+                  children: updateItem(i.children)
+                };
+              }
+              return i;
+            });
+          };
+          return updateItem(prev);
+        }
       });
 
-      // Если это был новый файл, выбираем его
-      if (isNewFile) {
+      // Если это была новая папка, выбираем её
+      if (isNewItem) {
         setSelectedItem(savedItem);
       }
     } catch (error) {
+      console.error('Ошибка при сохранении:', error);
       showError(item.id.startsWith('temp-file-') ? 'Ошибка при создании файла' : 
                 item.id.startsWith('temp-') ? 'Ошибка при создании папки' : 
                 'Ошибка при обновлении');
@@ -740,6 +955,7 @@ function Knowledge() {
 
   const handleSelectItem = async (item: KnowledgeItem) => {
     console.log('handleSelectItem вызван для элемента:', item);
+    
     
     // Если выбран элемент типа файл, загружаем его содержимое
     if (item.itemType === 'file') {
