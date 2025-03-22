@@ -97,20 +97,15 @@ function Knowledge() {
 
   const loadItems = async () => {
     try {
-      console.log('Loading knowledge items...');
       setIsLoading(true);
       const data = await knowledgeApi.getItems();
-      console.log('Received items:', data);
       
       if (Array.isArray(data) && data.length > 0) {
         setItems(data);
-        console.log('Items set successfully');
       } else {
-        console.warn('No items received or empty array');
         setItems([]);
       }
     } catch (error) {
-      console.error('Error loading items:', error);
       showError('Ошибка при загрузке данных');
       setItems([]);
     } finally {
@@ -145,8 +140,46 @@ function Knowledge() {
     return [];
   };
 
+  // Функция для подготовки элемента к добавлению дочерних элементов
+  const prepareParentForChildren = (parentId: string) => {
+    // Убедимся, что родительский элемент раскрыт
+    setExpandedFolders(prev => {
+      if (!prev.includes(parentId)) {
+        return [...prev, parentId];
+      }
+      return prev;
+    });
+    
+    // Убедимся, что у родительского элемента есть массив children
+    setItems(prev => {
+      const prepareParent = (items: KnowledgeItem[]): KnowledgeItem[] => {
+        return items.map(item => {
+          if (item.id === parentId) {
+            return {
+              ...item,
+              children: item.children || []
+            };
+          }
+          if (item.children) {
+            return {
+              ...item,
+              children: prepareParent(item.children)
+            };
+          }
+          return item;
+        });
+      };
+      return prepareParent(prev);
+    });
+  };
+
   const handleNewArticle = (type: string, parentId?: string) => {
     setShowNewArticleDialog(false);
+
+    // Если есть родительский элемент, подготовим его для добавления дочерних элементов
+    if (parentId) {
+      prepareParentForChildren(parentId);
+    }
 
     // Для пустой статьи и roadmap создаем временный файл и сразу включаем режим редактирования
     if (type === 'empty' || type === 'roadmap-item') {
@@ -210,7 +243,6 @@ function Knowledge() {
       setEditName(defaultName);
       setNewFileType(type);
       
-      // Здесь мы не отправляем запрос на сервер - это будет сделано после ввода имени
       return;
     }
 
@@ -299,7 +331,6 @@ function Knowledge() {
       setSelectedItem(createdFile);
     } catch (error) {
       showError('Ошибка при создании файла');
-      console.error('Error creating file:', error);
     }
   };
 
@@ -325,7 +356,6 @@ function Knowledge() {
       await knowledgeApi.updateItem(selectedItem.id, updatedItem);
       setSelectedItem(updatedItem);
     } catch (error) {
-      console.error('Error updating task:', error);
       showError('Ошибка при обновлении задачи');
     }
   };
@@ -434,6 +464,11 @@ function Knowledge() {
   };
 
   const addNewFolder = (parentId?: string) => {
+    // Если есть родительский элемент, подготовим его для добавления дочерних элементов
+    if (parentId) {
+      prepareParentForChildren(parentId);
+    }
+
     // Создаем новую папку сразу через API
     const newFolder: KnowledgeItem = {
       id: '',
@@ -552,7 +587,7 @@ function Knowledge() {
         // Выходим из режима редактирования
         setIsEditing(null);
         
-        // Асинхронно сохраняем файл на сервере
+        // Всегда сохраняем файл на сервере
         try {
           // Создаем объект для сохранения на сервере
           const newFile: KnowledgeItem = {
@@ -565,109 +600,90 @@ function Knowledge() {
             metadata: newFileType === 'roadmap-item' ? { completedTasks: [] } : undefined
           };
           
-          // Отправляем запрос на сервер без блокировки интерфейса
+          // Отправляем запрос на сервер
           const savedItem = await knowledgeApi.save(newFile);
-          console.log('Файл сохранен на сервере:', savedItem);
           
           // Получаем текущий временный ID файла
           const tempId = item.id;
+          // Получаем ID родительской папки
+          const parentId = item.parentId;
           
-          // Даже если сервер вернул некорректный ответ, продолжаем работу с файлом
-          let resultItemData: KnowledgeItem;
-          
-          if (!savedItem || !savedItem.id) {
-            console.error('Сервер вернул некорректный ответ без ID:', savedItem);
-            // Не показываем пользователю сообщение, чтобы не прерывать его работу
-            // showError('Предупреждение: сервер вернул некорректные данные. Файл доступен локально, но может быть потерян при обновлении страницы.');
-            
-            // Создаем локальную версию файла для продолжения работы
-            resultItemData = {
-              ...newFile,
-              id: tempId, // Используем существующий временный ID
-              name: updatedName,
-              content: updatedContent
-            };
-          } else {
-            // Сервер вернул нормальный ответ
-            resultItemData = {
+          // Проверяем, что сервер вернул корректный ответ
+          if (savedItem && savedItem.id) {
+            // Создаем объект с обновленными данными
+            const resultItem: KnowledgeItem = {
               ...savedItem,
               name: updatedName,
               content: updatedContent
             };
-          }
-          
-          // После получения ответа обновляем ID файла
-          setItems(prev => {
-            // Подход аналогичный созданию папки - удаляем временный файл и добавляем новый
-            const parentId = item.parentId;
             
-            // Сначала удаляем временный элемент
-            const removeTemp = (items: KnowledgeItem[]): KnowledgeItem[] => {
-              return items.filter(i => {
-                if (i.id === tempId) return false;
-                if (i.children) {
-                  i.children = removeTemp(i.children);
-                }
-                return true;
-              });
-            };
-            
-            let updatedItems = removeTemp(prev);
-            
-            // Используем полностью подготовленный объект результата
-            
-            // Обновляем выбранный файл
-            if (selectedItem?.id === tempId) {
-              setSelectedItem(resultItemData);
-              
-              // Если файл в папке, убедимся, что папка раскрыта
-              if (parentId) {
-                setExpandedFolders(prev => {
-                  if (!prev.includes(parentId)) {
-                    return [...prev, parentId];
-                  }
-                  return prev;
-                });
-              }
-              
-              // Включаем режим редактирования содержимого сразу после сохранения имени
-              if (newFileType === 'empty' || newFileType === 'roadmap-item') {
-                setTimeout(() => {
-                  setEditableContent(resultItemData.content || '');
-                  setIsEditingContent(true);
-                }, 100);
-              }
-            }
-            
-            // Затем добавляем новый элемент с реальным ID
-            if (!parentId) {
-              // Если нет родителя, добавляем в корень
-              return [...updatedItems, resultItemData];
-            } else {
-              // Если есть родитель, добавляем к соответствующей папке
-              const addToParent = (items: KnowledgeItem[]): KnowledgeItem[] => {
-                return items.map(i => {
-                  if (i.id === parentId) {
-                    return {
-                      ...i,
-                      children: [...(i.children || []), resultItemData]
-                    };
-                  }
+            // После получения ответа обновляем ID файла
+            setItems(prev => {
+              // Удаляем временный элемент
+              const removeTemp = (items: KnowledgeItem[]): KnowledgeItem[] => {
+                return items.filter(i => {
+                  if (i.id === tempId) return false;
                   if (i.children) {
-                    return {
-                      ...i,
-                      children: addToParent(i.children)
-                    };
+                    i.children = removeTemp(i.children);
                   }
-                  return i;
+                  return true;
                 });
               };
-              return addToParent(updatedItems);
-            }
-          });
+              
+              let updatedItems = removeTemp(prev);
+              
+              // Обновляем выбранный файл
+              if (selectedItem?.id === tempId) {
+                setSelectedItem(resultItem);
+                
+                // Если файл в папке, убедимся, что папка раскрыта
+                if (parentId) {
+                  setExpandedFolders(prev => {
+                    if (!prev.includes(parentId)) {
+                      return [...prev, parentId];
+                    }
+                    return prev;
+                  });
+                }
+                
+                // Включаем режим редактирования содержимого сразу после сохранения имени
+                if (newFileType === 'empty' || newFileType === 'roadmap-item') {
+                  setTimeout(() => {
+                    setEditableContent(resultItem.content || '');
+                    setIsEditingContent(true);
+                  }, 100);
+                }
+              }
+              
+              // Добавляем новый элемент с реальным ID
+              if (!parentId) {
+                // Если нет родителя, добавляем в корень
+                return [...updatedItems, resultItem];
+              } else {
+                // Если есть родитель, добавляем к соответствующей папке
+                const addToParent = (items: KnowledgeItem[]): KnowledgeItem[] => {
+                  return items.map(i => {
+                    if (i.id === parentId) {
+                      return {
+                        ...i,
+                        children: [...(i.children || []), resultItem]
+                      };
+                    }
+                    if (i.children) {
+                      return {
+                        ...i,
+                        children: addToParent(i.children)
+                      };
+                    }
+                    return i;
+                  });
+                };
+                return addToParent(updatedItems);
+              }
+            });
+          }
         } catch (error) {
-          console.error('Ошибка при сохранении файла на сервере:', error);
-          showError('Файл сохранен локально, но произошла ошибка при сохранении на сервере. Данные могут быть потеряны при обновлении страницы.');
+          showError('Произошла ошибка при сохранении файла на сервере. Данные могут быть потеряны при обновлении страницы.');
         }
         
         setNewFileType('');
@@ -767,7 +783,6 @@ function Knowledge() {
         setSelectedItem(savedItem);
       }
     } catch (error) {
-      console.error('Ошибка при сохранении:', error);
       showError(item.id.startsWith('temp-file-') ? 'Ошибка при создании файла' : 
                 item.id.startsWith('temp-') ? 'Ошибка при создании папки' : 
                 'Ошибка при обновлении');
@@ -795,26 +810,96 @@ function Knowledge() {
 
   const handleMoveItem = async (targetFolderId: string | null) => {
     if (!moveDialogItem) return;
+    
+    // Сохраняем копию элемента для перемещения
+    const itemToMove = { ...moveDialogItem };
+    
+    // Сразу закрываем диалог перемещения
     setMoveDialogItem(null);
-
-    try {
-      await knowledgeApi.moveItem(moveDialogItem.id, targetFolderId, moveDialogItem.itemType);
-      
-      // Если перемещаем в папку, убедимся, что она раскрыта
-      if (targetFolderId) {
-        setExpandedFolders(prev => {
-          if (!prev.includes(targetFolderId)) {
-            return [...prev, targetFolderId];
+    
+    // Если перемещаем в папку, убедимся, что она раскрыта
+    if (targetFolderId) {
+      setExpandedFolders(prev => {
+        if (!prev.includes(targetFolderId)) {
+          return [...prev, targetFolderId];
+        }
+        return prev;
+      });
+    }
+    
+    // Обновляем UI немедленно, не дожидаясь ответа от сервера
+    const oldParentId = itemToMove.parentId;
+    
+    // Создаем копию элемента с обновленным parentId
+    const updatedItem = {
+      ...itemToMove,
+      parentId: targetFolderId
+    };
+    
+    // Обновляем состояние локально
+    setItems(prev => {
+      // Функция для удаления элемента из старого местоположения
+      const removeFromOld = (items: KnowledgeItem[]): KnowledgeItem[] => {
+        return items.filter(item => {
+          if (item.id === itemToMove.id) {
+            return false;
           }
-          return prev;
+          
+          if (item.children) {
+            item.children = removeFromOld(item.children);
+          }
+          
+          return true;
         });
-      }
-
-      // Обновляем список после перемещения
-      loadItems();
+      };
+      
+      // Удаляем элемент из старого местоположения
+      let newItems = removeFromOld(prev);
+      
+      // Функция для добавления элемента в новое местоположение
+      const addToNew = (items: KnowledgeItem[]): KnowledgeItem[] => {
+        if (!targetFolderId) {
+          // Если перемещаем в корень
+          return [...items, updatedItem];
+        }
+        
+        return items.map(item => {
+          if (item.id === targetFolderId) {
+            return {
+              ...item,
+              children: [...(item.children || []), updatedItem]
+            };
+          }
+          
+          if (item.children) {
+            return {
+              ...item,
+              children: addToNew(item.children)
+            };
+          }
+          
+          return item;
+        });
+      };
+      
+      // Добавляем элемент в новое местоположение
+      return addToNew(newItems);
+    });
+    
+    // Если элемент был выбран, обновляем его в выбранном состоянии
+    if (selectedItem && selectedItem.id === itemToMove.id) {
+      setSelectedItem(updatedItem);
+    }
+    
+    // Отправляем запрос на перемещение в фоновом режиме
+    try {
+      await knowledgeApi.moveItem(itemToMove.id, targetFolderId, itemToMove.itemType);
+      // Успешно перемещено на сервере, ничего делать не нужно
     } catch (error) {
-      console.error('Error moving item:', error);
-      showError('Ошибка при перемещении элемента');
+      // Если запрос не удался, показываем ошибку
+      showError('Ошибка при перемещении элемента на сервере. Изменения могут быть потеряны после перезагрузки страницы.');
+      // При желании можно добавить обновление списка с сервера
+      // loadItems();
     }
   };
 
@@ -847,36 +932,44 @@ function Knowledge() {
   const confirmDelete = async () => {
     if (!itemToDelete) return;
     
+    // Сохраняем копию элемента для удаления
+    const itemToDeleteCopy = { ...itemToDelete };
+    
+    // Сразу закрываем диалог и очищаем состояние
+    setShowDeleteDialog(false);
+    setItemToDelete(null);
+    
+    // Если удаляемый элемент был выбран, сбрасываем выбор
+    if (selectedItem && selectedItem.id === itemToDeleteCopy.id) {
+      setSelectedItem(null);
+    }
+    
+    // Обновляем UI немедленно, не дожидаясь ответа от сервера
+    setItems(prev => {
+      const removeItem = (items: KnowledgeItem[]): KnowledgeItem[] => {
+        return items.filter(item => {
+          if (item.id === itemToDeleteCopy.id) {
+            return false;
+          }
+          
+          if (item.children) {
+            item.children = removeItem(item.children);
+          }
+          
+          return true;
+        });
+      };
+      
+      return removeItem(prev);
+    });
+    
+    // Отправляем запрос на удаление в фоновом режиме
     try {
-      await knowledgeApi.deleteItem(itemToDelete.id);
-      setItems(prev => {
-        const removeItem = (items: KnowledgeItem[]): KnowledgeItem[] => {
-          return items.filter(item => {
-            if (item.id === itemToDelete.id) {
-              return false;
-            }
-            
-            if (item.children) {
-              item.children = removeItem(item.children);
-            }
-            
-            return true;
-          });
-        };
-        
-        return removeItem(prev);
-      });
-      
-      // Если удаляемый элемент был выбран, сбрасываем выбор
-      if (selectedItem && selectedItem.id === itemToDelete.id) {
-        setSelectedItem(null);
-      }
-      
-      setShowDeleteDialog(false);
-      setItemToDelete(null);
+      await knowledgeApi.deleteItem(itemToDeleteCopy.id);
+      // Успешно удалено на сервере, ничего делать не нужно
     } catch (error) {
-      console.error('Error deleting item:', error);
-      showError('Ошибка при удалении элемента');
+      // Если запрос не удался, показываем ошибку, но не восстанавливаем удаленный элемент
+      showError('Ошибка при удалении элемента на сервере. Элемент может восстановиться после перезагрузки страницы.');
     }
   };
 
@@ -925,20 +1018,13 @@ function Knowledge() {
 
   const parseReels = (content: string | undefined): any[] => {
     if (!content) {
-      console.log('parseReels: content отсутствует');
       return [];
     }
     
-    console.log('parseReels: Получено содержимое для парсинга:', content.substring(0, 100) + '...');
-    
     try {
       const parsedData = JSON.parse(content);
-      console.log('parseReels: Данные успешно распарсены, количество элементов:', 
-                  Array.isArray(parsedData) ? parsedData.length : 'не массив');
       return parsedData;
     } catch (error) {
-      console.error('Error parsing reels JSON:', error);
-      console.log('Неудачная попытка парсинга, возвращаем пустой массив');
       return [];
     }
   };
@@ -948,31 +1034,22 @@ function Knowledge() {
     try {
       return JSON.parse(content);
     } catch (error) {
-      console.error('Error parsing content plan JSON:', error);
       return null;
     }
   };
 
   const handleSelectItem = async (item: KnowledgeItem) => {
-    console.log('handleSelectItem вызван для элемента:', item);
-    
-    
     // Если выбран элемент типа файл, загружаем его содержимое
     if (item.itemType === 'file') {
-      console.log('Выбран файл, отправляем запрос на получение содержимого для ID:', item.id);
       try {
         // Загружаем полное содержимое файла с сервера
-        console.log('Отправка запроса на GET /knowledge/file/' + item.id);
         const fullItem = await knowledgeApi.getFile(item.id);
-        console.log('Получен ответ от сервера:', fullItem);
         setSelectedItem(fullItem);
       } catch (error) {
-        console.error('Error loading file content:', error);
         setSelectedItem(item);
         showError('Ошибка при загрузке содержимого файла');
       }
     } else {
-      console.log('Выбрана папка, устанавливаем без запроса к API');
       setSelectedItem(item);
     }
     
@@ -994,8 +1071,6 @@ function Knowledge() {
   };
 
   const renderContent = () => {
-    console.log('renderContent вызван, selectedItem:', selectedItem);
-    
     if (isLoading) {
       return (
         <div className="flex items-center justify-center h-full">
@@ -1012,10 +1087,6 @@ function Knowledge() {
         </div>
       );
     }
-
-    console.log('Отображаем содержимое для элемента:', selectedItem);
-    console.log('Тип элемента:', selectedItem.itemType, 'Тип файла:', selectedItem.fileType);
-    console.log('Содержимое файла:', selectedItem.content ? 'Присутствует' : 'Отсутствует');
 
     return (
       <div className="space-y-6">
@@ -1162,31 +1233,27 @@ function Knowledge() {
             className="fixed bg-white dark:bg-gray-800 rounded-lg shadow-lg py-2 z-50"
             style={{ left: contextMenu.x, top: contextMenu.y }}
           >
-            {contextMenu.item.itemType === 'folder' && (
-              <>
-                <button
-                  onClick={() => {
-                    setNewArticleParentId(contextMenu.item.id);
-                    setShowNewArticleDialog(true);
-                    setContextMenu(null);
-                  }}
-                  className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center text-gray-900 dark:text-white"
-                >
-                  <FileText className="w-4 h-4 mr-2" />
-                  Новый файл
-                </button>
-                <button
-                  onClick={() => {
-                    addNewFolder(contextMenu.item.id);
-                    setContextMenu(null);
-                  }}
-                  className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center text-gray-900 dark:text-white"
-                >
-                  <FolderPlus className="w-4 h-4 mr-2" />
-                  Новая папка
-                </button>
-              </>
-            )}
+            <button
+              onClick={() => {
+                setNewArticleParentId(contextMenu.item.id);
+                setShowNewArticleDialog(true);
+                setContextMenu(null);
+              }}
+              className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center text-gray-900 dark:text-white"
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              Новый файл
+            </button>
+            <button
+              onClick={() => {
+                addNewFolder(contextMenu.item.id);
+                setContextMenu(null);
+              }}
+              className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center text-gray-900 dark:text-white"
+            >
+              <FolderPlus className="w-4 h-4 mr-2" />
+              Новая папка
+            </button>
             <button
               onClick={() => handleEdit(contextMenu.item)}
               className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center text-gray-900 dark:text-white"
@@ -1227,9 +1294,9 @@ function Knowledge() {
             </div>
             <p className="text-gray-600 dark:text-gray-300 mb-6">
               Вы уверены, что хотите удалить "{itemToDelete.name}"?
-              {itemToDelete.itemType === 'folder' && (
+              {(itemToDelete.itemType === 'folder' || (itemToDelete.children && itemToDelete.children.length > 0)) && (
                 <span className="block mt-2 text-red-500 text-sm">
-                  Внимание: все файлы внутри папки также будут удалены!
+                  Внимание: все файлы внутри {itemToDelete.itemType === 'folder' ? 'папки' : 'файла'} также будут удалены!
                 </span>
               )}
             </p>

@@ -158,7 +158,7 @@ export function ReelsList({ reels, sourceId, onReelsDeleted }: ReelsListProps) {
         }
       }
     } catch (error) {
-      console.error('Ошибка при загрузке кэшированных данных:', error);
+      // Ошибка при загрузке кэшированных данных
     }
   };
 
@@ -167,7 +167,7 @@ export function ReelsList({ reels, sourceId, onReelsDeleted }: ReelsListProps) {
     try {
       localStorage.setItem(cacheKey, JSON.stringify(reelsData));
     } catch (error) {
-      console.error('Ошибка при сохранении данных в кэш:', error);
+      // Ошибка при сохранении данных в кэш
     }
   };
 
@@ -176,7 +176,7 @@ export function ReelsList({ reels, sourceId, onReelsDeleted }: ReelsListProps) {
       const data = await knowledgeApi.getItems();
       setItems(data);
     } catch (error) {
-      console.error('Error loading items:', error);
+      // Ошибка загрузки элементов
     }
   };
 
@@ -240,7 +240,8 @@ export function ReelsList({ reels, sourceId, onReelsDeleted }: ReelsListProps) {
       setNormalizedReels(validReels);
       setIsLoading(false);
     } catch (error) {
-      console.error('Error normalizing reels data:', error);
+      // Ошибка нормализации данных
+      setIsLoading(false);
     }
   };
 
@@ -343,7 +344,7 @@ export function ReelsList({ reels, sourceId, onReelsDeleted }: ReelsListProps) {
       setShowMoveDialog(false);
       setSelectedReels([]);
     } catch (error) {
-      console.error('Failed to move reels:', error);
+      // Ошибка при перемещении
       showError('Ошибка при перемещении Reels. Пожалуйста, попробуйте еще раз.');
     } finally {
       setIsProcessing(false);
@@ -383,7 +384,7 @@ export function ReelsList({ reels, sourceId, onReelsDeleted }: ReelsListProps) {
         onReelsDeleted();
       }
     } catch (error) {
-      console.error('Failed to delete reels:', error);
+      // Ошибка при удалении
       showError('Ошибка при удалении Reels. Пожалуйста, попробуйте еще раз.');
     } finally {
       setIsProcessing(false);
@@ -492,12 +493,17 @@ export function ReelsList({ reels, sourceId, onReelsDeleted }: ReelsListProps) {
                           preload="metadata"
                           className="absolute inset-0 w-full h-full object-contain bg-black rounded-lg"
                           onError={(e) => {
-                            console.error('Error loading video:', e);
                             const target = e.target as HTMLVideoElement;
                             target.insertAdjacentHTML(
                               'afterend',
-                              '<div class="absolute inset-0 flex items-center justify-center bg-gray-900 text-white text-sm rounded-lg">Ошибка загрузки видео</div>'
+                              `<div class="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-70 text-white p-4 text-center rounded-lg">
+                                <div>
+                                  <div class="mb-2">❌ Ошибка загрузки видео</div>
+                                  <div class="text-sm opacity-80">Видео недоступно или удалено</div>
+                                </div>
+                              </div>`
                             );
+                            target.style.display = 'none';
                           }}
                         >
                           Ваш браузер не поддерживает видео.

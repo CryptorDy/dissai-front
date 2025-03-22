@@ -136,8 +136,6 @@ function mapKnowledgeItemToApi(item: KnowledgeItem): any {
 
 // Вспомогательная функция для преобразования API элемента в KnowledgeItem
 function mapApiItemToKnowledgeItem(item: KnowledgeItemDto): KnowledgeItem {
-  console.log('mapApiItemToKnowledgeItem вызван с:', item);
-  
   if (!item) {
     return {
       id: '',
@@ -173,7 +171,6 @@ export const knowledgeApi = {
       // Преобразуем элементы из Children с CamelCase-именами в KnowledgeItemDto
       const items = response.data.Children.map(item => mapCamelCaseToKnowledgeItemDto(item))
         .map(item => mapApiItemToKnowledgeItem(item));
-      console.log('Processed items:', items);
       return items;
     } 
     // Если ответ уже является массивом
@@ -183,12 +180,10 @@ export const knowledgeApi = {
         return response.data.map(item => mapCamelCaseToKnowledgeItemDto(item))
           .map(item => mapApiItemToKnowledgeItem(item));
       } else {
-        console.log('Processing regular array');
         return response.data.map(item => mapApiItemToKnowledgeItem(item as KnowledgeItemDto));
       }
     }
     
-    console.log('No valid data format found, returning empty array');
     return [];
   }),
   

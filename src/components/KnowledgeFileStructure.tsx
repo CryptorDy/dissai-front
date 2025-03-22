@@ -83,7 +83,6 @@ export function KnowledgeFileStructure({
   const renderItem = (item: KnowledgeItem, level = 0) => {
     // Защита от ошибок с undefined id
     if (!item || !item.id) {
-      console.warn('Элемент без id в списке файлов:', item);
       return null;
     }
     
@@ -91,6 +90,8 @@ export function KnowledgeFileStructure({
     const isItemEditing = isEditing === item.id;
     const isTemporary = item.id.startsWith('temp-');
     const displayName = (isTemporary && !item.name) ? "Новый файл" : (item.name || "Новый файл");
+    // Проверяем, есть ли у элемента дочерние элементы
+    const hasChildren = item.children && item.children.length > 0;
 
     return (
       <React.Fragment key={item.id}>
@@ -100,15 +101,18 @@ export function KnowledgeFileStructure({
           }`}
           style={{ paddingLeft: `${level * 1.5 + 0.5}rem` }}
           onClick={() => {
+            if (item.itemType === 'folder' || hasChildren) {
+              onToggleFolder(item.id);
+            }
+            
             if (item.itemType === 'file') {
               onSelectItem(item);
-            } else {
-              onToggleFolder(item.id);
             }
           }}
           onContextMenu={(e) => onContextMenu(e, item)}
         >
-          {item.itemType === 'folder' && (
+          {/* Отображаем стрелку раскрытия для папок и файлов с дочерними элементами */}
+          {(item.itemType === 'folder' || hasChildren) && (
             <ChevronRight
               className={`w-4 h-4 mr-2 transition-transform text-gray-400 dark:text-gray-300 ${isExpanded ? 'transform rotate-90' : ''}`}
             />
@@ -143,7 +147,8 @@ export function KnowledgeFileStructure({
             <MoreVertical className="w-4 h-4 text-gray-500 dark:text-gray-400" />
           </button>
         </div>
-        {item.itemType === 'folder' && isExpanded && item.children && (
+        {/* Отображаем дочерние элементы для папок и файлов, если они есть и раскрыты */}
+        {isExpanded && hasChildren && item.children && (
           <div>
             {item.children.filter(child => child && child.id).map(child => renderItem(child, level + 1))}
           </div>
