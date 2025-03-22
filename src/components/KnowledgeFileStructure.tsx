@@ -89,7 +89,18 @@ export function KnowledgeFileStructure({
     const isExpanded = expandedFolders.includes(item.id);
     const isItemEditing = isEditing === item.id;
     const isTemporary = item.id.startsWith('temp-');
-    const displayName = (isTemporary && !item.name) ? "Новый файл" : (item.name || "Новый файл");
+    // Изменяем логику определения отображаемого имени для временных элементов
+    let displayName = item.name || "";
+    if (isTemporary && !item.name) {
+      // Определяем тип временного элемента по префиксу ID
+      if (item.id.startsWith('temp-folder-')) {
+        displayName = "Новая папка";
+      } else {
+        displayName = "Новый файл";
+      }
+    } else {
+      displayName = item.name || "Без имени";
+    }
     // Проверяем, есть ли у элемента дочерние элементы
     const hasChildren = item.children && item.children.length > 0;
 

@@ -469,61 +469,52 @@ function Knowledge() {
       prepareParentForChildren(parentId);
     }
 
-    // Создаем новую папку сразу через API
-    const newFolder: KnowledgeItem = {
-      id: '',
+    // Создаем временную папку с уникальным ID
+    const tempId = `temp-folder-${Date.now()}`;
+    const defaultName = ''; // Пустое имя, чтобы поле ввода было пустым
+    
+    // Создаем временную папку для немедленного отображения
+    const tempFolder: KnowledgeItem = {
+      id: tempId,
       itemType: 'folder',
-      name: 'Новая папка',
+      name: defaultName,
       children: [],
       parentId: parentId || null
     };
+    
+    // Добавляем временную папку в состояние
+    setItems(prev => {
+      if (!parentId) {
+        return [...prev, tempFolder];
+      }
 
-    // Отправляем на сервер
-    knowledgeApi.save(newFolder)
-      .then(createdFolder => {
-        // Если указан parentId, убедимся, что родительская папка раскрыта
-        if (parentId) {
-          setExpandedFolders(prev => {
-            if (!prev.includes(parentId)) {
-              return [...prev, parentId];
+      const addToParent = (items: KnowledgeItem[]): KnowledgeItem[] => {
+        return items.map(item => {
+          if (item.id === parentId) {
+            // Убедимся, что папка раскрыта
+            if (!expandedFolders.includes(parentId)) {
+              setExpandedFolders(prev => [...prev, parentId]);
             }
-            return prev;
-          });
-        }
-        
-        // Добавляем созданную папку в состояние
-        setItems(prev => {
-          if (!parentId) {
-            return [...prev, createdFolder];
+            return {
+              ...item,
+              children: [...(item.children || []), tempFolder]
+            };
           }
-
-          const addToParent = (items: KnowledgeItem[]): KnowledgeItem[] => {
-            return items.map(item => {
-              if (item.id === parentId) {
-                return {
-                  ...item,
-                  children: [...(item.children || []), createdFolder]
-                };
-              }
-              if (item.children) {
-                return {
-                  ...item,
-                  children: addToParent(item.children)
-                };
-              }
-              return item;
-            });
-          };
-          return addToParent(prev);
+          if (item.children) {
+            return {
+              ...item,
+              children: addToParent(item.children)
+            };
+          }
+          return item;
         });
+      };
+      return addToParent(prev);
+    });
 
-        // Включаем режим редактирования для новой папки
-        setIsEditing(createdFolder.id);
-        setEditName('Новая папка');
-      })
-      .catch(error => {
-        showError('Ошибка при создании папки');
-      });
+    // Включаем режим редактирования для новой папки
+    setIsEditing(tempId);
+    setEditName(defaultName);
   };
 
   const handleSaveEdit = async (item: KnowledgeItem) => {
@@ -541,6 +532,7 @@ function Knowledge() {
       // Если ID начинается с temp-, значит это новый элемент
       const isNewItem = item.id.startsWith('temp-');
       const isNewFile = item.id.startsWith('temp-file-');
+      const isNewFolder = item.id.startsWith('temp-folder-');
       
       // Если это временный файл без имени, то создаем имя и отправляем на сервер
       if (isNewFile) {
@@ -689,6 +681,122 @@ function Knowledge() {
         return;
       }
       
+      // Если это временная папка, создаем и сохраняем ее
+      if (isNewFolder) {
+        // Сначала обновляем локальное состояние для быстрого отображения
+        const updatedName = editName.trim();
+        
+        // Временно обновляем состояние для мгновенного отображения
+        const updatedTempItem = {
+          ...item,
+          name: updatedName
+        };
+        
+        // Обновляем локальное состояние без ожидания ответа от сервера
+        setItems(prev => {
+          const updateItem = (items: KnowledgeItem[]): KnowledgeItem[] => {
+            return items.map(i => {
+              if (i.id === item.id) {
+                return updatedTempItem;
+              }
+              if (i.children) {
+                return { ...i, children: updateItem(i.children) };
+              }
+              return i;
+            });
+          };
+          return updateItem(prev);
+        });
+        
+        // Выходим из режима редактирования
+        setIsEditing(null);
+        
+        // Создаем объект для сохранения на сервере
+        const newFolder: KnowledgeItem = {
+          id: '',
+          itemType: 'folder',
+          name: updatedName,
+          children: [],
+          parentId: item.parentId
+        };
+        
+        try {
+          // Отправляем асинхронный запрос на сервер
+          const savedItem = await knowledgeApi.save(newFolder);
+          
+          // Получаем текущий временный ID папки
+          const tempId = item.id;
+          // Получаем ID родительской папки
+          const parentId = item.parentId;
+          
+          // Проверяем, что сервер вернул корректный ответ
+          if (savedItem && savedItem.id) {
+            // После получения ответа обновляем ID папки
+            setItems(prev => {
+              // Удаляем временный элемент
+              const removeTemp = (items: KnowledgeItem[]): KnowledgeItem[] => {
+                return items.filter(i => {
+                  if (i.id === tempId) return false;
+                  if (i.children) {
+                    i.children = removeTemp(i.children);
+                  }
+                  return true;
+                });
+              };
+              
+              let updatedItems = removeTemp(prev);
+              
+              // Если нет родителя, добавляем в корень
+              if (!parentId) {
+                return [...updatedItems, savedItem];
+              } else {
+                // Если есть родитель, добавляем к соответствующей папке
+                const addToParent = (items: KnowledgeItem[]): KnowledgeItem[] => {
+                  return items.map(i => {
+                    if (i.id === parentId) {
+                      return {
+                        ...i,
+                        children: [...(i.children || []), savedItem]
+                      };
+                    }
+                    if (i.children) {
+                      return {
+                        ...i,
+                        children: addToParent(i.children)
+                      };
+                    }
+                    return i;
+                  });
+                };
+                return addToParent(updatedItems);
+              }
+            });
+            
+            // Если это была новая папка, выбираем её
+            setSelectedItem(savedItem);
+          }
+        } catch (error) {
+          showError('Ошибка при создании папки');
+          
+          // В случае ошибки удаляем временную папку из состояния
+          setItems(prev => {
+            const removeItem = (items: KnowledgeItem[]): KnowledgeItem[] => {
+              return items.filter(i => {
+                if (i.id === item.id) return false;
+                if (i.children) {
+                  i.children = removeItem(i.children);
+                }
+                return true;
+              });
+            };
+            return removeItem(prev);
+          });
+        }
+        
+        return;
+      }
+      
+      // Обработка других временных элементов или обновление существующих
       let savedItem;
       if (isNewItem) {
         // Создаем новую папку
@@ -783,7 +891,8 @@ function Knowledge() {
       }
     } catch (error) {
       showError(item.id.startsWith('temp-file-') ? 'Ошибка при создании файла' : 
-                item.id.startsWith('temp-') ? 'Ошибка при создании папки' : 
+                item.id.startsWith('temp-folder-') ? 'Ошибка при создании папки' : 
+                item.id.startsWith('temp-') ? 'Ошибка при создании элемента' : 
                 'Ошибка при обновлении');
       
       // В случае ошибки при создании нового элемента удаляем его из состояния
