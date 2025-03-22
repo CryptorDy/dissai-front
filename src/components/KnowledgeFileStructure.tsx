@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import { 
   ChevronRight, 
   MoreVertical, 
@@ -51,11 +51,36 @@ export function KnowledgeFileStructure({
   // Эффект для фокуса на инпуте при редактировании
   useEffect(() => {
     if (isEditing && inputRef.current) {
-      inputRef.current.focus();
-      // Выделяем весь текст при фокусе
-      inputRef.current.select();
+      // Небольшая задержка для корректной работы фокуса
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus();
+          // Выделяем весь текст при фокусе
+          inputRef.current.select();
+        }
+      }, 50);
     }
   }, [isEditing]);
+
+  // Функция для обработки клика по элементу
+  const handleItemClick = useCallback((item: KnowledgeItem) => {
+    // Проверяем, имеет ли элемент временный ID
+    if (item.id.startsWith('temp-')) {
+      console.log('КFS: Выбран элемент с временным ID:', item.id);
+    }
+    
+    onSelectItem(item);
+  }, [onSelectItem]);
+  
+  // Функция для проверки, является ли элемент выбранным
+  const isItemSelected = useCallback((itemId: string): boolean => {
+    // Проверяем, имеет ли элемент временный ID и выбран ли он
+    if (itemId.startsWith('temp-') && selectedItem?.id?.startsWith('temp-')) {
+      console.log('KFS: Сравнение временных ID:', itemId, selectedItem.id);
+    }
+    
+    return itemId === selectedItem?.id;
+  }, [selectedItem]);
 
   const getFileIcon = (fileType?: string) => {
     switch (fileType) {
@@ -80,19 +105,29 @@ export function KnowledgeFileStructure({
     }
   };
 
-  const renderItem = (item: KnowledgeItem, level = 0) => {
+  const renderItem = useCallback((item: KnowledgeItem, level: number = 0) => {
+    // Проверяем, имеет ли элемент временный ID при рендеринге
+    if (item.id.startsWith('temp-')) {
+      console.log('КFS: Рендеринг элемента с временным ID:', item.id, 'выбранный ID:', selectedItem?.id);
+    }
+    
     // Защита от ошибок с undefined id
     if (!item || !item.id) {
       return null;
     }
     
+    // Проверяем, является ли папка развернутой
     const isExpanded = expandedFolders.includes(item.id);
+    
+    // Проверяем, является ли элемент выбранным
+    const selected = isItemSelected(item.id);
+    
     const isItemEditing = isEditing === item.id;
     const isTemporary = item.id.startsWith('temp-');
     // Изменяем логику определения отображаемого имени для временных элементов
     let displayName = item.name || "";
     if (isTemporary && !item.name) {
-      // Определяем тип временного элемента по префиксу ID
+      // Определяем тип временного элемента по префиксу ID только если имя пустое
       if (item.id.startsWith('temp-folder-')) {
         displayName = "Новая папка";
       } else {
@@ -108,7 +143,7 @@ export function KnowledgeFileStructure({
       <React.Fragment key={item.id}>
         <div
           className={`group flex items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg cursor-pointer ${
-            selectedItem?.id === item.id ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+            selected ? 'bg-blue-50 dark:bg-blue-900/20' : ''
           }`}
           style={{ paddingLeft: `${level * 1.5 + 0.5}rem` }}
           onClick={() => {
@@ -116,9 +151,7 @@ export function KnowledgeFileStructure({
               onToggleFolder(item.id);
             }
             
-            if (item.itemType === 'file') {
-              onSelectItem(item);
-            }
+            handleItemClick(item);
           }}
           onContextMenu={(e) => onContextMenu(e, item)}
         >
@@ -169,7 +202,7 @@ export function KnowledgeFileStructure({
         )}
       </React.Fragment>
     );
-  };
+  }, [expandedFolders, isEditing, editName, onToggleFolder, onSelectItem, onContextMenu, isItemSelected, handleItemClick]);
 
   return (
     <div className="w-80 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm flex flex-col border-r border-gray-200 dark:border-gray-700">

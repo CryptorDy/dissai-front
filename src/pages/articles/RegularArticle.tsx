@@ -190,16 +190,23 @@ function RegularArticle() {
     
     if (targetFolderId !== undefined && fileName) {
       try {
-        const newItem: KnowledgeItem = {
-          id: '',
-          type: 'file',
+        const newArticle: KnowledgeItem = {
+          id: `temp-file-${Date.now()}`,
+          itemType: 'file',
           fileType: 'article',
           name: fileName,
-          content,
-          parentId: targetFolderId
+          content: content,
+          parentId: targetFolderId,
         };
 
-        await knowledgeApi.save(newItem);
+        // Создаем копию для отправки на сервер с пустым ID
+        const articleToSave = {
+          ...newArticle,
+          id: ''
+        };
+
+        console.log("Отправляем статью на сервер с пустым ID");
+        await knowledgeApi.save(articleToSave);
         setShowSaveDialog(false);
       } catch (error) {
         console.error('Failed to save article:', error);
