@@ -735,6 +735,10 @@ function Knowledge() {
     setSelectedItem(newFolder);
     setIsEditing(tempId);
     setEditName('Новая папка');
+    
+    // Важно: не отправляем запрос на сервер сразу!
+    // Запрос будет отправлен только после того, как пользователь 
+    // закончит редактирование имени в функции handleSaveEdit
   };
 
   const handleSaveEdit = async (item: KnowledgeItem) => {
@@ -933,105 +937,9 @@ function Knowledge() {
           console.log("Отправляем на сервер:", JSON.stringify(updatedItem));
           
           // Для обычного элемента - обновляем только имя
-          let savedItem: KnowledgeItem;
           if (!item.id.startsWith('temp-')) {
             console.log("Обновляем существующий элемент:", item.id);
-            savedItem = await knowledgeApi.updateItem(item.id, updatedItem);
-          } else {
-            // Для временного элемента, который не файл - создаем новый
-            console.log("Создаем новый элемент из временного:", item.id);
-            
-            // Создаем копию для отправки на сервер с пустым ID
-            const itemToSaveToServer = {
-              ...updatedItem,
-              id: '' // Используем пустой ID для сервера
-            };
-            
-            console.log("Отправляем на сервер с пустым ID:", itemToSaveToServer);
-            savedItem = await knowledgeApi.save(itemToSaveToServer);
-            
-            // Получаем текущий временный ID
-            const tempId = item.id;
-            console.log("Временный ID элемента:", tempId);
-            console.log("Получен постоянный ID с сервера:", savedItem.id);
-            
-            // Полностью обновляем состояние после получения постоянного ID
-            setItems(prev => {
-              // Создаем глубокую копию состояния
-              const newState = JSON.parse(JSON.stringify(prev));
-              console.log("Создана глубокая копия состояния для обновления другого типа временного элемента");
-              
-              const updateItemsState = (items: KnowledgeItem[]): KnowledgeItem[] => {
-                return items.map(i => {
-                  // Если нашли элемент с временным ID, заменяем его полностью
-                  if (i.id === tempId) {
-                    console.log("Найден элемент с временным ID для замены:", i.id);
-                    // Возвращаем новый объект с постоянным ID, сохраняя все свойства
-                    return {
-                      ...i,
-                      id: savedItem.id
-                    };
-                  }
-                  
-                  // Обновляем parentId, если он ссылается на временный ID
-                  if (i.parentId === tempId) {
-                    console.log("Обновляем parentId с временного на постоянный:", i.id, "parentId:", tempId, "->", savedItem.id);
-                    return {
-                      ...i,
-                      parentId: savedItem.id
-                    };
-                  }
-                  
-                  // Если есть дочерние элементы, рекурсивно обрабатываем их
-                  if (i.children && i.children.length > 0) {
-                    return {
-                      ...i,
-                      children: updateItemsState(i.children)
-                    };
-                  }
-                  
-                  return i;
-                });
-              };
-              
-              // Применяем функцию обновления к копии состояния
-              const updatedState = updateItemsState(newState);
-              console.log("Состояние обновлено с новыми ID для другого типа временного элемента");
-              return updatedState;
-            });
-            
-            // Обновляем выбранный элемент если он совпадает с временным
-            if (selectedItem?.id === tempId) {
-              console.log("Обновляем ID выбранного элемента:", tempId, "->", savedItem.id);
-              
-              // Обновляем ID выбранного файла, создавая новый объект
-              setSelectedItem({
-                ...selectedItem,
-                id: savedItem.id
-              });
-              
-              console.log("ID выбранного элемента после обновления:", selectedItem?.id);
-              
-              // Добавим отложенную проверку для подтверждения обновления
-              setTimeout(() => {
-                console.log("Проверка ID выбранного элемента через setTimeout:", selectedItem?.id);
-              }, 500);
-            }
-            // Также проверяем, не является ли выбранный элемент дочерним для обновляемого
-            else if (selectedItem?.parentId === tempId) {
-              console.log("Обновляем parentId выбранного элемента:", selectedItem.id, "parentId:", tempId, "->", savedItem.id);
-              
-              // Обновляем parentId выбранного элемента
-              setSelectedItem({
-                ...selectedItem,
-                parentId: savedItem.id
-              });
-            }
-          }
-          
-          // Для не-временных элементов просто обновляем состояние
-          if (!item.id.startsWith('temp-')) {
-            console.log("Обновляем отображение для существующего элемента:", savedItem);
+            const savedItem = await knowledgeApi.updateItem(item.id, updatedItem);
             
             // Обновляем состояние
             setItems(prev => {
@@ -1055,6 +963,151 @@ function Knowledge() {
               };
               return updateItem(prev);
             });
+          } else {
+            // Для временного элемента, который не файл - создаем новый
+            console.log("Создаем новый элемент из временного:", item.id);
+            
+            // Создаем копию для отправки на сервер с пустым ID
+            const itemToSaveToServer = {
+              ...updatedItem,
+              id: '' // Используем пустой ID для сервера
+            };
+            
+            // Получаем текущий временный ID
+            const tempId = item.id;
+            console.log("Временный ID элемента:", tempId);
+            
+            // Завершаем редактирование перед отправкой запроса
+            setIsEditing(null);
+            setNewFileType('');
+            
+            // Обновляем имя временной папки в UI немедленно
+            setItems(prev => {
+              const updateTempName = (items: KnowledgeItem[]): KnowledgeItem[] => {
+                return items.map(i => {
+                  if (i.id === tempId) {
+                    return {
+                      ...i,
+                      name: newName
+                    };
+                  }
+                  if (i.children && i.children.length > 0) {
+                    return {
+                      ...i,
+                      children: updateTempName(i.children)
+                    };
+                  }
+                  return i;
+                });
+              };
+              return updateTempName(prev);
+            });
+            
+            // Обновляем имя выбранного элемента, если это тот же самый
+            if (selectedItem?.id === tempId) {
+              setSelectedItem(prev => ({
+                ...prev!,
+                name: newName
+              }));
+            }
+            
+            console.log("Отправляем на сервер с пустым ID:", itemToSaveToServer);
+            
+            // Асинхронно отправляем запрос на сервер для сохранения папки
+            knowledgeApi.save(itemToSaveToServer)
+              .then(savedItem => {
+                console.log("Получен ответ от сервера с постоянным ID:", savedItem?.id);
+                
+                // Проверка успешного ответа от сервера и наличия ID
+                if (savedItem && savedItem.id) {
+                  console.log("Начинаем обновление состояния: замена временного ID на постоянный");
+                  console.log("Временный ID ->", tempId);
+                  console.log("Постоянный ID ->", savedItem.id);
+                  
+                  // ПОЛНОСТЬЮ ОБНОВЛЯЕМ СОСТОЯНИЕ с новым постоянным ID
+                  setItems(prev => {
+                    // Создаем глубокую копию состояния
+                    const newState = JSON.parse(JSON.stringify(prev));
+                    console.log("Создана глубокая копия состояния для обновления другого типа временного элемента");
+                    
+                    const updateItemsState = (items: KnowledgeItem[]): KnowledgeItem[] => {
+                      return items.map(i => {
+                        // Если нашли элемент с временным ID, заменяем его полностью
+                        if (i.id === tempId) {
+                          console.log("Найден элемент с временным ID для замены:", i.id);
+                          // Возвращаем новый объект с постоянным ID, сохраняя все свойства
+                          return {
+                            ...i,
+                            id: savedItem.id
+                          };
+                        }
+                        
+                        // Обновляем parentId, если он ссылается на временный ID
+                        if (i.parentId === tempId) {
+                          console.log("Обновляем parentId с временного на постоянный:", i.id, "parentId:", tempId, "->", savedItem.id);
+                          return {
+                            ...i,
+                            parentId: savedItem.id
+                          };
+                        }
+                        
+                        // Если есть дочерние элементы, рекурсивно обрабатываем их
+                        if (i.children && i.children.length > 0) {
+                          return {
+                            ...i,
+                            children: updateItemsState(i.children)
+                          };
+                        }
+                        
+                        return i;
+                      });
+                    };
+                    
+                    // Применяем функцию обновления к копии состояния
+                    const updatedState = updateItemsState(newState);
+                    console.log("Состояние обновлено с новыми ID для другого типа временного элемента");
+                    return updatedState;
+                  });
+                  
+                  // Обновляем выбранный элемент если он совпадает с временным
+                  if (selectedItem?.id === tempId) {
+                    console.log("Обновляем ID выбранного элемента:", tempId, "->", savedItem.id);
+                    
+                    // Обновляем ID выбранного файла, создавая новый объект
+                    setSelectedItem({
+                      ...selectedItem,
+                      id: savedItem.id
+                    });
+                    
+                    console.log("ID выбранного элемента после обновления:", selectedItem?.id);
+                    
+                    // Добавим отложенную проверку для подтверждения обновления
+                    setTimeout(() => {
+                      console.log("Проверка ID выбранного элемента через setTimeout:", selectedItem?.id);
+                    }, 500);
+                  }
+                  // Также проверяем, не является ли выбранный элемент дочерним для обновляемого
+                  else if (selectedItem?.parentId === tempId) {
+                    console.log("Обновляем parentId выбранного элемента:", selectedItem.id, "parentId:", tempId, "->", savedItem.id);
+                    
+                    // Обновляем parentId выбранного элемента
+                    setSelectedItem({
+                      ...selectedItem,
+                      parentId: savedItem.id
+                    });
+                  }
+                } else {
+                  console.error("Ошибка: Не получен корректный ID с сервера", savedItem);
+                  showError('Сервер вернул некорректный ответ при сохранении. Пожалуйста, обновите страницу.');
+                }
+              })
+              .catch(error => {
+                console.error("Ошибка при создании папки:", error);
+                showError('Ошибка при создании папки');
+              });
+              
+            // Не ждем завершения запроса, продолжаем выполнение
+            return;
           }
         } catch (error) {
           console.error("Ошибка при обновлении элемента:", error);
