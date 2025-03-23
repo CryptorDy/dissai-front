@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 function Landing() {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const [iframeHeight, setIframeHeight] = useState('100vh');
   const [iframeReady, setIframeReady] = useState(false);
 
@@ -66,8 +68,16 @@ function Landing() {
             button.style.marginTop = '20px';
             button.style.display = 'inline-block';
             button.textContent = 'Начать бесплатно';
-            button.href = '/auth/login';
-            button.target = '_top';
+            
+            // Обрабатываем клик на кнопке через JavaScript для корректного обновления URL
+            button.addEventListener('click', (e) => {
+              e.preventDefault();
+              const targetPath = isAuthenticated ? '/studio' : '/auth/login';
+              
+              // Используем абсолютный URL вместо относительного
+              const baseUrl = window.location.origin;
+              window.location.href = `${baseUrl}${targetPath}`;
+            });
             
             // Добавляем кнопку в конец блока .hero__content
             const heroContent = heroSection.querySelector('.hero__content');
@@ -130,7 +140,7 @@ function Landing() {
     const timer = setTimeout(injectCSS, 2000);
     
     return () => clearTimeout(timer);
-  }, []);
+  }, [isAuthenticated]);  // Добавляем isAuthenticated в зависимости, чтобы кнопка обновлялась
 
   return (
     <div className="landing-wrapper" style={{ height: '100vh', overflow: 'hidden', position: 'relative' }}>
@@ -151,4 +161,4 @@ function Landing() {
   );
 }
 
-export default Landing; 
+export default Landing;

@@ -90,7 +90,9 @@ function ReelsTranscription() {
       }
 
       startGeneration(data.taskId, 'reels', 'Анализ аккаунтов Reels');
-      navigate('/dashboard');
+      
+      const baseUrl = window.location.origin;
+      window.location.href = `${baseUrl}/studio`;
 
     } catch (error) {
       console.error('Error analyzing accounts:', error);
@@ -144,7 +146,9 @@ function ReelsTranscription() {
       }
 
       startGeneration(data.taskId, 'reels', 'Анализ Reels');
-      navigate('/dashboard');
+      
+      const baseUrl = window.location.origin;
+      window.location.href = `${baseUrl}/studio`;
 
     } catch (error) {
       console.error('Error analyzing single reel:', error);

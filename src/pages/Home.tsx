@@ -1,5 +1,5 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   MessageCircle, 
   FileText, 
@@ -26,6 +26,16 @@ type Feature = {
 
 function Home() {
   const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Убедимся, что URL правильно отображается в адресной строке
+  useEffect(() => {
+    // Если текущий URL не /studio, заменим его
+    if (location.pathname !== '/studio') {
+      // Используем window.history.replaceState для изменения URL без перезагрузки
+      window.history.replaceState(null, '', '/studio');
+    }
+  }, [location.pathname]);
   
   const features: Feature[] = [
     {

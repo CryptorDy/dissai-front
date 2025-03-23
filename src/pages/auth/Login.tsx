@@ -21,8 +21,9 @@ function Login() {
   useEffect(() => {
     if (isAuthenticated) {
       // Если пользователь уже авторизован, перенаправляем на страницу студии
-      // Используем прямое изменение URL для гарантированного обновления
-      window.location.href = '/studio';
+      // Используем абсолютный URL для гарантированного обновления
+      const baseUrl = window.location.origin;
+      window.location.href = `${baseUrl}/studio`;
     }
   }, [isAuthenticated]);
 
@@ -49,8 +50,9 @@ function Login() {
 
       login(response.Token);
       
-      // Используем прямое изменение URL для гарантированного обновления
-      window.location.href = '/studio';
+      // Используем абсолютный URL для гарантированного обновления
+      const baseUrl = window.location.origin;
+      window.location.href = `${baseUrl}/studio`;
     } catch (error: any) {
       const errorMessage = error.response?.data?.Error || error.message || 'Ошибка при авторизации';
       setFormError(errorMessage);
@@ -65,8 +67,9 @@ function Login() {
         const result = await authService.googleAuth(response.access_token);
         if (result.token) {
           login(result.token);
-          // Используем прямое изменение URL для гарантированного обновления
-          window.location.href = '/studio';
+          // Используем абсолютный URL для гарантированного обновления
+          const baseUrl = window.location.origin;
+          window.location.href = `${baseUrl}/studio`;
         } else {
           navigate('/auth/setup-nickname');
         }

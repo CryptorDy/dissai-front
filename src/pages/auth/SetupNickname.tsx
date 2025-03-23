@@ -25,7 +25,10 @@ function SetupNickname() {
 
     try {
       await authService.setNickname(nickname, token);
-      navigate('/dashboard');
+      
+      // Используем абсолютный URL для гарантированного обновления
+      const baseUrl = window.location.origin;
+      window.location.href = `${baseUrl}/studio`;
     } catch (error: any) {
       showError(error.response?.data?.message || 'Ошибка при установке никнейма');
     } finally {
