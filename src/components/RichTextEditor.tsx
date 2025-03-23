@@ -18,29 +18,107 @@ import Superscript from '@tiptap/extension-superscript';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
+import Placeholder from '@tiptap/extension-placeholder';
 import { common, createLowlight } from 'lowlight';
-import { Edit2, FileDown, Eye, Plus } from 'lucide-react';
+import { FileDown, Plus, X, Type } from 'lucide-react';
 import { Toolbar } from './editor/Toolbar';
 import { BlockSelector } from './editor/BlockSelector';
+import { Extension } from '@tiptap/core';
+import { Plugin } from 'prosemirror-state';
 
 const lowlight = createLowlight(common);
 
+// Создаем расширение для работы с новой строкой
+const NewLineHandling = Extension.create({
+  name: 'newLineHandling',
+  
+  addKeyboardShortcuts() {
+    return {
+      Enter: () => {
+        const { selection } = this.editor.state;
+        const { $anchor, empty } = selection;
+        
+        // Если курсор находится в пустом параграфе, создаем новый пустой
+        if (empty && $anchor.parent.type.name === 'paragraph' && $anchor.parent.textContent === '') {
+          return this.editor.chain().focus().createParagraphNear().run();
+        }
+        
+        // Если курсор находится в конце параграфа (не пустого), также создаем новый параграф
+        if ($anchor.pos === $anchor.end() && !empty) {
+          return this.editor.chain().focus().createParagraphNear().run();
+        }
+        
+        // Иначе просто новая строка
+        return false;
+      }
+    };
+  },
+  
+  // Добавляем обработку автоматического создания новой строки при достижении конца документа
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        props: {
+          handleClick: (view, pos, event) => {
+            // Определяем, что клик произошел за последним содержимым (в пустой области редактора)
+            const { state } = view;
+            const docSize = state.doc.content.size;
+            
+            // Если клик после последнего содержимого документа
+            if (pos >= docSize - 2) {
+              // Создаем новый пустой параграф и устанавливаем курсор
+              this.editor.chain()
+                .insertContentAt(docSize - 1, '<p></p>')
+                .focus(docSize + 1)
+                .run();
+                
+              return true;
+            }
+            
+            return false;
+          }
+        }
+      })
+    ];
+  }
+});
+
+// Добавляем стили для редактора
+const editorStyles = `
+.ProseMirror {
+  min-height: 150px;
+  outline: none;
+  padding-bottom: 100px; /* Добавляем отступ снизу для удобства клика */
+}
+
+.ProseMirror p.is-empty::before {
+  color: #adb5bd;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+/* Добавляем стиль для курсора на пустом месте редактора */
+.ProseMirror-trailingBreak {
+  cursor: text;
+}
+`;
+
 interface RichTextEditorProps {
   content: string;
-  isEditing: boolean;
-  onEdit: () => void;
   onSave: () => void;
   onChange: (value: string) => void;
   title?: string;
   withBackground?: boolean;
   format?: 'html' | 'markdown';
   itemId?: string;
+  onEdit?: () => void;
+  isEditing?: boolean;
 }
 
 export function RichTextEditor({
   content,
-  isEditing,
-  onEdit,
   onSave,
   onChange,
   title = 'Редактор',
@@ -50,7 +128,9 @@ export function RichTextEditor({
 }: RichTextEditorProps) {
   const [showBlockSelector, setShowBlockSelector] = useState(false);
   const [blockSelectorPosition, setBlockSelectorPosition] = useState({ x: 0, y: 0 });
+  const [showToolbar, setShowToolbar] = useState(false);
   const floatingButtonRef = useRef<HTMLButtonElement>(null);
+  const editorContentRef = useRef<HTMLDivElement>(null);
 
   const editor = useEditor({
     extensions: [
@@ -70,11 +150,20 @@ export function RichTextEditor({
         },
         codeBlock: false,
         paragraph: {
-          HTMLAttributes: {
-            class: 'text-gray-900 dark:text-gray-100 leading-normal'
-          }
+          HTMLAttributes: ({ node }: { node: { content: { size: number } } }) => ({
+            class: `text-gray-900 dark:text-gray-100 leading-normal ${node.content.size === 0 ? 'is-empty' : ''}`,
+            'data-placeholder': 'Просто пишите...',
+          }),
         }
       }),
+      Placeholder.configure({
+        placeholder: 'Просто пишите...',
+        emptyEditorClass: 'is-editor-empty',
+        emptyNodeClass: 'is-empty',
+        showOnlyWhenEditable: true,
+        includeChildren: true,
+      }),
+      NewLineHandling,
       CodeBlockLowlight.configure({
         lowlight,
         HTMLAttributes: {
@@ -141,19 +230,26 @@ export function RichTextEditor({
       })
     ],
     content,
-    editable: isEditing,
+    editable: true,
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
-    }
+    },
+    autofocus: 'end',
   });
 
+  // Фокус на последний пустой параграф при монтировании
   useEffect(() => {
-    if (editor && !isEditing) {
-      editor.setEditable(false);
-    } else if (editor && isEditing) {
+    if (editor) {
       editor.setEditable(true);
+      
+      // Проверяем, пуст ли редактор
+      if (editor.isEmpty) {
+        // Добавляем начальный пустой параграф, если редактор пуст
+        editor.commands.setContent('<p></p>');
+        editor.commands.focus('end');
+      }
     }
-  }, [content, isEditing, editor]);
+  }, [content, editor]);
 
   const handleExportPDF = () => {
     if (!editor) return;
@@ -213,17 +309,18 @@ export function RichTextEditor({
 
   return (
     <div className={withBackground ? "bg-white dark:bg-gray-800 rounded-xl p-8" : ""}>
+      <style>{editorStyles}</style>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-          {isEditing ? `Редактирование: ${title}` : title}
+          {title}
         </h2>
         <div className="flex items-center gap-2">
           <button
-            onClick={onEdit}
-            className="p-2 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-            title={isEditing ? 'Просмотр' : 'Редактировать'}
+            onClick={() => setShowToolbar(!showToolbar)}
+            className={`p-2 ${showToolbar ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'} rounded-lg hover:bg-blue-700 hover:text-white transition-colors`}
+            title={showToolbar ? 'Скрыть панель форматирования' : 'Показать панель форматирования'}
           >
-            {isEditing ? <Eye className="w-4 h-4" /> : <Edit2 className="w-4 h-4" />}
+            {showToolbar ? <X className="w-4 h-4" /> : <Type className="w-4 h-4" />}
           </button>
           <button
             onClick={handleExportPDF}
@@ -236,31 +333,32 @@ export function RichTextEditor({
       </div>
 
       <div className="relative">
-        {isEditing && editor && (
+        {editor && showToolbar && (
           <Toolbar editor={editor} />
         )}
 
-        <div className="prose dark:prose-invert max-w-none">
+        <div 
+          className="prose dark:prose-invert max-w-none" 
+          ref={editorContentRef}
+        >
           <EditorContent editor={editor} />
         </div>
 
-        {isEditing && (
+        {showToolbar && (
           <div className="h-[52px]" />
         )}
       </div>
 
-      {isEditing && (
-        <button
-          ref={floatingButtonRef}
-          onClick={handleOpenBlockSelector}
-          className="fixed bottom-8 right-8 p-4 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
-          title="Добавить блок"
-        >
-          <Plus className="w-6 h-6" />
-        </button>
-      )}
+      <button
+        ref={floatingButtonRef}
+        onClick={handleOpenBlockSelector}
+        className="fixed bottom-8 right-8 p-4 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
+        title="Добавить блок"
+      >
+        <Plus className="w-6 h-6" />
+      </button>
 
-      {isEditing && editor && (
+      {editor && (
         <BlockSelector
           editor={editor}
           isOpen={showBlockSelector}
