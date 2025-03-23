@@ -136,7 +136,11 @@ function mapKnowledgeItemToApi(item: KnowledgeItem): any {
 
 // Вспомогательная функция для преобразования API элемента в KnowledgeItem
 function mapApiItemToKnowledgeItem(item: KnowledgeItemDto): KnowledgeItem {
+  // Добавляем логирование входных данных
+  console.log('mapApiItemToKnowledgeItem: Входные данные:', JSON.stringify(item));
+  
   if (!item) {
+    console.error('mapApiItemToKnowledgeItem: Получен пустой объект!');
     return {
       id: '',
       itemType: 'file' as 'file',
@@ -145,8 +149,11 @@ function mapApiItemToKnowledgeItem(item: KnowledgeItemDto): KnowledgeItem {
     };
   }
   
+  // Логируем id перед его использованием
+  console.log('mapApiItemToKnowledgeItem: ID в ответе:', item.id);
+  
   const result: KnowledgeItem = {
-    id: item.id,
+    id: item.id || '', // Используем пустую строку, если id не определен
     itemType: (item.itemType === 'folder' ? 'folder' : 'file') as 'file' | 'folder',
     name: item.name,
     fileType: item.fileType || undefined,
@@ -158,6 +165,9 @@ function mapApiItemToKnowledgeItem(item: KnowledgeItemDto): KnowledgeItem {
     parentId: item.parentId,
     metadata: item.metadata
   };
+  
+  // Логируем результат 
+  console.log('mapApiItemToKnowledgeItem: Результат преобразования:', JSON.stringify(result));
   
   return result;
 }
@@ -208,9 +218,48 @@ export const knowledgeApi = {
   
   // Создание или обновление элемента
   save: (data: KnowledgeItem) => {
+    console.log('knowledgeApi.save: Начало запроса с данными:', JSON.stringify(data));
     const serverData = mapKnowledgeItemToApi(data);
-    return api.post<KnowledgeItemDto>('/knowledge/save', serverData)
-      .then(response => mapApiItemToKnowledgeItem(response.data));
+    console.log('knowledgeApi.save: Данные для отправки на сервер:', JSON.stringify(serverData));
+    
+    return api.post<KnowledgeItemDto | any>('/knowledge/save', serverData)
+      .then(response => {
+        console.log('knowledgeApi.save: Получен ответ от сервера:', JSON.stringify(response.data));
+        
+        // Проверяем формат данных ответа
+        if (response.data && typeof response.data === 'object') {
+          // Проверяем, если данные в CamelCase формате (UpperCase)
+          if ('Id' in response.data) {
+            console.log('knowledgeApi.save: Обнаружен CamelCase формат ответа');
+            const normalizedData = mapCamelCaseToKnowledgeItemDto(response.data);
+            return mapApiItemToKnowledgeItem(normalizedData);
+          } 
+          // Проверяем наличие id в ответе
+          else if (!response.data.id) {
+            console.error('knowledgeApi.save: В ответе сервера отсутствует id!', response.data);
+            // Если id отсутствует, но есть другие идентификаторы, пробуем их использовать
+            if (response.data.Id) {
+              console.log('knowledgeApi.save: Найден Id в CamelCase формате');
+              const responseAny = response.data as any;
+              responseAny.id = responseAny.Id;
+            } else if (response.data._id) {
+              console.log('knowledgeApi.save: Найден _id формат');
+              const responseAny = response.data as any;
+              responseAny.id = responseAny._id;
+            }
+          }
+        } else {
+          console.error('knowledgeApi.save: Неожиданный формат ответа от сервера:', response.data);
+        }
+        
+        const result = mapApiItemToKnowledgeItem(response.data);
+        console.log('knowledgeApi.save: Итоговый результат:', JSON.stringify(result));
+        return result;
+      })
+      .catch(error => {
+        console.error('knowledgeApi.save: Ошибка при выполнении запроса:', error);
+        throw error;
+      });
   },
   
   // Перемещение элемента к новому родителю
