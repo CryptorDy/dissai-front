@@ -22,6 +22,7 @@ import Placeholder from '@tiptap/extension-placeholder';
 import { common, createLowlight } from 'lowlight';
 import { FileDown, Plus, X, Type, Grid2x2 } from 'lucide-react';
 import { Toolbar } from './editor/Toolbar';
+import { BlockSelector as HtmlBlockSelector } from './editor/BlockHtmlSelector';
 import { BlockSelector } from './editor/BlockSelector';
 import { Extension } from '@tiptap/core';
 import { Plugin } from 'prosemirror-state';
@@ -324,6 +325,52 @@ const editorStyles = `
   user-select: none;
 }
 
+/* Стили для плавающей панели форматирования */
+.floating-toolbar {
+  z-index: 50;
+  background: white;
+  border-radius: 6px;
+  padding: 2px;
+  pointer-events: all;
+  position: absolute;
+  box-shadow: none;
+  border: 1px solid #e5e7eb;
+  opacity: 0;
+  animation: fadeInOpacity 300ms forwards;
+}
+
+@keyframes fadeInOpacity {
+  to {
+    opacity: 1;
+  }
+}
+
+/* Удаляем стрелку плавающей панели */
+.floating-toolbar:after {
+  display: none;
+}
+
+/* Делаем инструменты в панели более компактными */
+.floating-toolbar button {
+  padding: 2px !important;
+  margin: 0 !important;
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+  min-height: 28px !important;
+}
+
+/* Темная тема для панели */
+.dark .floating-toolbar {
+  background: #1f2937;
+  border: 1px solid #374151;
+}
+
+/* Удаляем стрелку для темной темы */
+.dark .floating-toolbar:after {
+  display: none;
+}
+
 /* Исправляем проблемы с отображением текста */
 .ProseMirror h1, .ProseMirror h2, .ProseMirror h3, 
 .ProseMirror ul, .ProseMirror ol, .ProseMirror blockquote {
@@ -368,13 +415,14 @@ export function RichTextEditor({
 }: RichTextEditorProps) {
   const [showBlockSelector, setShowBlockSelector] = useState(false);
   const [blockSelectorPosition, setBlockSelectorPosition] = useState({ x: 0, y: 0 });
-  const [showToolbar, setShowToolbar] = useState(false);
+  const [selectionCoords, setSelectionCoords] = useState<{ x: number; y: number } | null>(null);
   const floatingButtonRef = useRef<HTMLButtonElement>(null);
   const editorContentRef = useRef<HTMLDivElement>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
   
   // Состояние для отображения меню блока (4 точек)
-  const [showBlockMenu, setShowBlockMenu] = useState(false);
-  const [blockMenuPosition, setBlockMenuPosition] = useState({ x: 0, y: 0 });
+  const [showHtmlBlockSelector, setShowHtmlBlockSelector] = useState(false);
+  const [htmlBlockSelectorPosition, setHtmlBlockSelectorPosition] = useState({ x: 0, y: 0 });
 
   const editor = useEditor({
     extensions: [
@@ -483,10 +531,51 @@ export function RichTextEditor({
     autofocus: 'end',
   });
 
-  // Обработчик для делегирования событий и обработки кликов на иконку меню
+  // Добавляем обработчик события выделения текста и клика на иконку
   useEffect(() => {
     if (!editor || !editorContentRef.current) return;
-    
+
+    // Функция для определения координат выделения
+    const handleSelectionChange = () => {
+      if (editor.view.hasFocus() && !editor.state.selection.empty) {
+        // Получаем текущее выделение
+        const { from, to } = editor.state.selection;
+        
+        // Если есть выделение
+        if (from !== to) {
+          try {
+            const view = editor.view;
+            
+            // Получаем DOM-селекцию для более точного позиционирования
+            const selection = window.getSelection();
+            if (!selection || selection.rangeCount === 0) return;
+            
+            const range = selection.getRangeAt(0);
+            const rect = range.getBoundingClientRect();
+            
+            // Используем rect для получения точных координат выделенного текста
+            const centerX = rect.left + rect.width / 2;
+            
+            // Вычисляем отступ от верха выделения (сразу над текстом)
+            const topOffset = rect.top - 94; // 65px над текстом
+            
+            // Устанавливаем координаты для отображения панели
+            setSelectionCoords({ 
+              x: centerX, 
+              y: topOffset
+            });
+          } catch (error) {
+            console.error('Error getting selection coordinates:', error);
+            setSelectionCoords(null);
+          }
+        }
+      } else {
+        // Если нет выделения, скрываем панель
+        setSelectionCoords(null);
+      }
+    };
+
+    // Обработчик клика на иконку меню (4 точек) перед параграфом
     const handleEditorClick = (e: Event) => {
       const mouseEvent = e as MouseEvent;
       const target = mouseEvent.target as HTMLElement;
@@ -501,24 +590,37 @@ export function RichTextEditor({
           // Устанавливаем выделение на этот параграф
           editor.commands.setTextSelection(pos);
           
-          // Вместо BlockMenu открываем BlockSelector
-          setBlockSelectorPosition({ 
+          // Открываем HtmlBlockSelector вместо BlockSelector
+          setHtmlBlockSelectorPosition({ 
             x: rect.left, 
             y: rect.top 
           });
-          setShowBlockSelector(true);
+          setShowHtmlBlockSelector(true);
           
           mouseEvent.preventDefault();
           mouseEvent.stopPropagation();
         }
       }
     };
+
+    // Комбинированный обработчик для события клика
+    const handleCombinedClick = (e: Event) => {
+      // Убираем setTimeout и вызываем напрямую
+      handleSelectionChange();
+      handleEditorClick(e);
+    };
+
+    // Добавляем слушатель события selectionchange
+    document.addEventListener('selectionchange', handleSelectionChange);
     
+    // Добавляем слушатель клика для проверки выделения и для клика на иконке 4 точек
     const editorEl = editorContentRef.current.querySelector('.ProseMirror');
-    editorEl?.addEventListener('click', handleEditorClick);
-    
+    editorEl?.addEventListener('click', handleCombinedClick);
+
     return () => {
-      editorEl?.removeEventListener('click', handleEditorClick);
+      document.removeEventListener('selectionchange', handleSelectionChange);
+      const editorEl = editorContentRef.current?.querySelector('.ProseMirror');
+      editorEl?.removeEventListener('click', handleCombinedClick);
     };
   }, [editor]);
 
@@ -589,6 +691,11 @@ export function RichTextEditor({
   };
 
   const handleOpenBlockSelector = () => {
+    // Открываем обычный BlockSelector для кнопки "+"
+    setBlockSelectorPosition({
+      x: Math.max(100, window.innerWidth - 300),
+      y: Math.max(100, window.innerHeight - 400)
+    });
     setShowBlockSelector(true);
   };
 
@@ -599,27 +706,22 @@ export function RichTextEditor({
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
           {title}
         </h2>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowToolbar(!showToolbar)}
-            className={`p-2 ${showToolbar ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'} rounded-lg hover:bg-blue-700 hover:text-white transition-colors`}
-            title={showToolbar ? 'Скрыть панель форматирования' : 'Показать панель форматирования'}
-          >
-            {showToolbar ? <X className="w-4 h-4" /> : <Type className="w-4 h-4" />}
-          </button>
-          <button
-            onClick={handleExportPDF}
-            className="p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-            title="Скачать PDF"
-          >
-            <FileDown className="w-4 h-4" />
-          </button>
-        </div>
       </div>
 
       <div className="relative">
-        {editor && showToolbar && (
-          <Toolbar editor={editor} />
+        {editor && selectionCoords && (
+          <div 
+            ref={toolbarRef}
+            className="floating-toolbar"
+            style={{
+              position: 'fixed',
+              top: `${selectionCoords.y}px`,
+              left: `${selectionCoords.x}px`,
+              transform: 'translate(-50%, -100%)'
+            }}
+          >
+            <Toolbar editor={editor} />
+          </div>
         )}
 
         <div 
@@ -628,28 +730,24 @@ export function RichTextEditor({
         >
           <EditorContent editor={editor} />
         </div>
-
-        {showToolbar && (
-          <div className="h-[52px]" />
-        )}
       </div>
 
-      <button
-        ref={floatingButtonRef}
-        onClick={handleOpenBlockSelector}
-        className="fixed bottom-8 right-8 p-4 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
-        title="Добавить блок"
-      >
-        <Plus className="w-6 h-6" />
-      </button>
-
       {editor && (
-        <BlockSelector
-          editor={editor}
-          isOpen={showBlockSelector}
-          onClose={() => setShowBlockSelector(false)}
-          position={blockSelectorPosition}
-        />
+        <>
+          <BlockSelector
+            editor={editor}
+            isOpen={showBlockSelector}
+            onClose={() => setShowBlockSelector(false)}
+            position={blockSelectorPosition}
+          />
+          
+          <HtmlBlockSelector
+            editor={editor}
+            isOpen={showHtmlBlockSelector}
+            onClose={() => setShowHtmlBlockSelector(false)}
+            position={htmlBlockSelectorPosition}
+          />
+        </>
       )}
     </div>
   );

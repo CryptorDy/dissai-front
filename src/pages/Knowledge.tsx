@@ -6,7 +6,8 @@ import {
   FolderPlus, 
   Move,
   FileText,
-  MessageCircle
+  MessageCircle,
+  FileDown
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { NavigationMenu } from '../components/NavigationMenu';
@@ -22,6 +23,13 @@ import { KnowledgeChat } from '../components/KnowledgeChat';
 import { KnowledgeFileStructure } from '../components/KnowledgeFileStructure';
 import { useToast } from '../context/ToastContext';
 import { ContentPlanViewer } from '../components/ContentPlanViewer';
+
+// Добавим объявление типа html2pdf для окна
+declare global {
+  interface Window {
+    html2pdf: any;
+  }
+}
 
 function Knowledge() {
   const navigate = useNavigate();
@@ -1658,6 +1666,72 @@ function Knowledge() {
     }
   };
 
+  // Добавим функцию для экспорта PDF
+  const handleExportPDF = (item: KnowledgeItem) => {
+    if (!item || !item.content) return;
+    
+    // Убедимся, что html2pdf доступен
+    if (typeof window.html2pdf === 'undefined') {
+      console.error('html2pdf не найден. Убедитесь, что библиотека подключена.');
+      return;
+    }
+    
+    const element = document.createElement('div');
+    element.className = 'prose max-w-none p-8';
+    element.style.color = '#000000';
+    
+    const styleElement = document.createElement('style');
+    styleElement.textContent = `
+      * {
+        color: #000000 !important;
+      }
+      h1, h2, h3, h4, h5, h6 {
+        color: #000000 !important;
+        margin-bottom: 1em;
+      }
+      p {
+        color: #000000 !important;
+        margin-bottom: 0.5em;
+      }
+      a {
+        color: #2563eb !important;
+        text-decoration: underline;
+      }
+    `;
+    element.appendChild(styleElement);
+    
+    const titleElement = document.createElement('h1');
+    titleElement.style.fontSize = '24px';
+    titleElement.style.fontWeight = 'bold';
+    titleElement.style.marginBottom = '24px';
+    titleElement.style.color = '#000000';
+    titleElement.textContent = item.name || 'Документ';
+    
+    element.appendChild(titleElement);
+    
+    const contentDiv = document.createElement('div');
+    contentDiv.innerHTML = item.content;
+    element.appendChild(contentDiv);
+
+    const opt = {
+      margin: 10,
+      filename: `${(item.name || 'document').toLowerCase().replace(/\s+/g, '-')}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2 },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    try {
+      // @ts-ignore
+      html2pdf().set(opt).from(element).save();
+    } catch (error) {
+      console.error('Ошибка при создании PDF:', error);
+    }
+    
+    // Закрываем контекстное меню
+    setContextMenu(null);
+  };
+
   return (
     <div className="min-h-screen h-screen bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-900 dark:to-gray-800 transition-colors duration-200 flex flex-col">
       <NavigationMenu />
@@ -1774,6 +1848,18 @@ function Knowledge() {
               <Move className="w-4 h-4 mr-2 text-blue-500" />
               Переместить
             </button>
+            
+            {/* Кнопка "Скачать PDF" только для типа article */}
+            {contextMenu.item.fileType === 'article' && (
+              <button
+                onClick={() => handleExportPDF(contextMenu.item)}
+                className="w-full px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center text-gray-900 dark:text-white transition-all"
+              >
+                <FileDown className="w-4 h-4 mr-2 text-blue-500" />
+                Скачать PDF
+              </button>
+            )}
+            
             <button
               onClick={() => handleDelete(contextMenu.item)}
               className="w-full px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center text-red-500 transition-all"
