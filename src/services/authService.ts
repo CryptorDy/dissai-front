@@ -20,6 +20,11 @@ const api = {
       credentials: 'include'
     });
 
+    if (response.status === 401) {
+      const errorData = await response.json().catch(() => ({ error: 'Ошибка авторизации' }));
+      return { Success: false, Error: errorData.error || 'Неверный логин или пароль' };
+    }
+
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: 'Network response was not ok' }));
       throw new Error(error.message || 'Network response was not ok');
@@ -51,6 +56,10 @@ export const authService = {
     try {
       const response = await api.post(AUTH_ENDPOINTS.login, { email, password });
       
+      if (response.Success === false) {
+        return response;
+      }
+      
       if (response.Success && response.Token) {
         localStorage.setItem('auth_token', response.Token);
       }
@@ -60,10 +69,10 @@ export const authService = {
         token: response.Token
       };
     } catch (error: any) {
-      if (error.response?.data) {
-        return error.response.data;
-      }
-      throw error;
+      return {
+        Success: false,
+        Error: error.message || 'Ошибка при авторизации'
+      };
     }
   },
 

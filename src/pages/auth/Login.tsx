@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Mail, Lock, LogIn, AlertCircle } from 'lucide-react';
 import { useGoogleLogin } from '@react-oauth/google';
@@ -9,13 +9,22 @@ import { authService } from '../../services/authService';
 function Login() {
   const navigate = useNavigate();
   const { showError } = useToast();
-  const { login } = useAuth();
+  const { login, isAuthenticated } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     identifier: '',
     password: ''
   });
+  
+  // Проверяем авторизацию при загрузке компонента
+  useEffect(() => {
+    if (isAuthenticated) {
+      // Если пользователь уже авторизован, перенаправляем на страницу студии
+      // Используем прямое изменение URL для гарантированного обновления
+      window.location.href = '/studio';
+    }
+  }, [isAuthenticated]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,17 +36,21 @@ function Login() {
       const response = await authService.login(formData.identifier, formData.password);
       
       if (!response.Success) {
-        setFormError(response.Error || 'Ошибка авторизации');
+        setFormError(response.Error || 'Неверный логин или пароль');
+        setIsLoading(false);
         return;
       }
 
       if (!response.Token) {
         setFormError('Ошибка авторизации: токен не получен');
+        setIsLoading(false);
         return;
       }
 
       login(response.Token);
-      navigate('/dashboard', { replace: true });
+      
+      // Используем прямое изменение URL для гарантированного обновления
+      window.location.href = '/studio';
     } catch (error: any) {
       const errorMessage = error.response?.data?.Error || error.message || 'Ошибка при авторизации';
       setFormError(errorMessage);
@@ -52,7 +65,8 @@ function Login() {
         const result = await authService.googleAuth(response.access_token);
         if (result.token) {
           login(result.token);
-          navigate('/dashboard', { replace: true });
+          // Используем прямое изменение URL для гарантированного обновления
+          window.location.href = '/studio';
         } else {
           navigate('/auth/setup-nickname');
         }
@@ -85,9 +99,9 @@ function Login() {
           </h2>
 
           {formError && (
-            <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+            <div className="mb-6 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
               <div className="flex items-center">
-                <AlertCircle className="w-5 h-5 text-red-500 mr-2" />
+                <AlertCircle className="w-5 h-5 text-red-500 dark:text-red-400 flex-shrink-0 mr-2" />
                 <p className="text-sm text-red-600 dark:text-red-400">{formError}</p>
               </div>
             </div>
@@ -104,7 +118,11 @@ function Login() {
                   type="text"
                   value={formData.identifier}
                   onChange={(e) => setFormData({ ...formData, identifier: e.target.value })}
-                  className="w-full pl-10 p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white"
+                  className={`w-full pl-10 p-3 rounded-lg border ${
+                    formError ? 'border-red-300 dark:border-red-700' : 'border-gray-200 dark:border-gray-700'
+                  } bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 ${
+                    formError ? 'focus:ring-red-500/25' : 'focus:ring-blue-500/25'
+                  }`}
                   placeholder="Введите email или логин"
                   required
                 />
