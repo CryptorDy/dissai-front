@@ -1,0 +1,134 @@
+/* Базовые стили редактора */
+.ProseMirror {
+  min-height: 150px;
+  outline: none;
+  padding-bottom: 100px; /* Добавляем отступ снизу для удобства клика */
+  padding-left: 24px; /* Уменьшаем отступ слева для меню блока */
+}
+
+/* Плейсхолдер для пустых параграфов */
+.ProseMirror p.is-empty::after {
+  content: 'Просто пишите...';
+  color: #adb5bd;
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+/* Создаем иконку меню через псевдоэлемент ТОЛЬКО для пустых параграфов */
+.ProseMirror p.is-empty::before {
+  content: '';
+  position: absolute;
+  left: -22px;
+  top: 4px;
+  width: 16px;
+  height: 16px;
+  opacity: 0;
+  transition: opacity 0.2s;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23adb5bd' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='7' height='7'%3E%3C/rect%3E%3Crect x='14' y='3' width='7' height='7'%3E%3C/rect%3E%3Crect x='3' y='14' width='7' height='7'%3E%3C/rect%3E%3Crect x='14' y='14' width='7' height='7'%3E%3C/rect%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  z-index: 10; /* Убеждаемся, что иконка отображается поверх других элементов */
+}
+
+/* Показываем иконку при наведении только для пустых параграфов */
+.ProseMirror p.is-empty:hover::before {
+  opacity: 1;
+}
+
+/* Добавляем стиль для курсора на пустом месте редактора */
+.ProseMirror-trailingBreak {
+  cursor: text;
+}
+
+/* Стили для модального окна */
+.block-menu {
+  min-width: 220px;
+  user-select: none;
+}
+
+/* Стили для плавающей панели форматирования */
+.floating-toolbar {
+  z-index: 50;
+  background: white;
+  border-radius: 6px;
+  padding: 2px;
+  pointer-events: all;
+  position: absolute;
+  box-shadow: none;
+  border: 1px solid #e5e7eb;
+  opacity: 0;
+  animation: fadeInOpacity 300ms forwards;
+}
+
+@keyframes fadeInOpacity {
+  to {
+    opacity: 1;
+  }
+}
+
+/* Удаляем стрелку плавающей панели */
+.floating-toolbar:after {
+  display: none;
+}
+
+/* Делаем инструменты в панели более компактными */
+.floating-toolbar button {
+  padding: 2px !important;
+  margin: 0 !important;
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+  min-height: 28px !important;
+}
+
+/* Темная тема для панели */
+.dark .floating-toolbar {
+  background: #1f2937;
+  border: 1px solid #374151;
+}
+
+/* Удаляем стрелку для темной темы */
+.dark .floating-toolbar:after {
+  display: none;
+}
+
+/* Исправляем проблемы с отображением текста */
+.ProseMirror h1, .ProseMirror h2, .ProseMirror h3, 
+.ProseMirror ul, .ProseMirror ol, .ProseMirror blockquote {
+  position: relative;
+  margin: 1em 0;
+}
+
+/* Базовые стили блоков */
+.ProseMirror p {
+  position: relative;
+  line-height: 1.5; /* Явно задаем высоту строки для предотвращения съезжания */
+  margin: 0.5em 0; /* Стандартный отступ для параграфов */
+  margin-bottom: 1em;
+}
+
+/* Базовые стили для заголовков */
+.ProseMirror h1 {
+  font-size: 2em;
+  font-weight: bold;
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+}
+
+.ProseMirror h2 {
+  font-size: 1.5em;
+  font-weight: bold;
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+}
+
+.ProseMirror h3 {
+  font-size: 1.17em;
+  font-weight: bold;
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+} 

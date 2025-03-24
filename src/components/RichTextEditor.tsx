@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useEditor, EditorContent } from '@tiptap/react';
+import { useEditor, EditorContent, Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import Table from '@tiptap/extension-table';
@@ -22,14 +22,21 @@ import Placeholder from '@tiptap/extension-placeholder';
 import { common, createLowlight } from 'lowlight';
 import { FileDown, Plus, X, Type, Grid2x2 } from 'lucide-react';
 import { Toolbar } from './editor/Toolbar';
-import { BlockSelector as HtmlBlockSelector } from './editor/BlockHtmlSelector';
 import { BlockSelector } from './editor/BlockSelector';
+import { BlockSelector as HtmlBlockSelector } from './editor/BlockHtmlSelector';
 import { Extension } from '@tiptap/core';
 import { Plugin } from 'prosemirror-state';
 import { Decoration, DecorationSet } from 'prosemirror-view';
-import { Editor } from '@tiptap/core';
+import ListItem from '@tiptap/extension-list-item';
+import Dropcursor from '@tiptap/extension-dropcursor';
+import Document from '@tiptap/extension-document';
 
-const lowlight = createLowlight(common);
+// Импорт стилей из внешних файлов
+import './editor/styles/editorStyles.css';
+import './editor/styles/blockStyles.css';
+
+// Инициализация lowlight для подсветки синтаксиса
+const lowlightPlugin = createLowlight(common);
 
 // Интерфейс для компонента меню блока
 interface BlockMenuProps {
@@ -265,119 +272,53 @@ const NewLineHandling = Extension.create({
   }
 });
 
-// Добавляем стили для редактора
-const editorStyles = `
-.ProseMirror {
-  min-height: 150px;
-  outline: none;
-  padding-bottom: 100px; /* Добавляем отступ снизу для удобства клика */
-  padding-left: 24px; /* Уменьшаем отступ слева для меню блока */
-}
-
-/* Стили для параграфа с иконкой меню */
-.ProseMirror p {
-  position: relative;
-  line-height: 1.5; /* Явно задаем высоту строки для предотвращения съезжания */
-  margin: 0.5em 0; /* Стандартный отступ для параграфов */
-}
-
-/* Плейсхолдер для пустых параграфов */
-.ProseMirror p.is-empty::after {
-  content: 'Просто пишите...';
-  color: #adb5bd;
-  position: absolute;
-  left: 0;
-  top: 0;
-  pointer-events: none;
-  opacity: 0.6;
-}
-
-/* Создаем иконку меню через псевдоэлемент ТОЛЬКО для пустых параграфов */
-.ProseMirror p.is-empty::before {
-  content: '';
-  position: absolute;
-  left: -22px;
-  top: 4px;
-  width: 16px;
-  height: 16px;
-  opacity: 0;
-  transition: opacity 0.2s;
-  cursor: pointer;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23adb5bd' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='7' height='7'%3E%3C/rect%3E%3Crect x='14' y='3' width='7' height='7'%3E%3C/rect%3E%3Crect x='3' y='14' width='7' height='7'%3E%3C/rect%3E%3Crect x='14' y='14' width='7' height='7'%3E%3C/rect%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: center;
-  z-index: 10; /* Убеждаемся, что иконка отображается поверх других элементов */
-}
-
-/* Показываем иконку при наведении только для пустых параграфов */
-.ProseMirror p.is-empty:hover::before {
-  opacity: 1;
-}
-
-/* Добавляем стиль для курсора на пустом месте редактора */
-.ProseMirror-trailingBreak {
-  cursor: text;
-}
-
-/* Стили для модального окна */
-.block-menu {
-  min-width: 220px;
-  user-select: none;
-}
-
-/* Стили для плавающей панели форматирования */
-.floating-toolbar {
-  z-index: 50;
-  background: white;
-  border-radius: 6px;
-  padding: 2px;
-  pointer-events: all;
-  position: absolute;
-  box-shadow: none;
-  border: 1px solid #e5e7eb;
-  opacity: 0;
-  animation: fadeInOpacity 300ms forwards;
-}
-
-@keyframes fadeInOpacity {
-  to {
-    opacity: 1;
-  }
-}
-
-/* Удаляем стрелку плавающей панели */
-.floating-toolbar:after {
-  display: none;
-}
-
-/* Делаем инструменты в панели более компактными */
-.floating-toolbar button {
-  padding: 2px !important;
-  margin: 0 !important;
-  width: 28px !important;
-  height: 28px !important;
-  min-width: 28px !important;
-  min-height: 28px !important;
-}
-
-/* Темная тема для панели */
-.dark .floating-toolbar {
-  background: #1f2937;
-  border: 1px solid #374151;
-}
-
-/* Удаляем стрелку для темной темы */
-.dark .floating-toolbar:after {
-  display: none;
-}
-
-/* Исправляем проблемы с отображением текста */
-.ProseMirror h1, .ProseMirror h2, .ProseMirror h3, 
-.ProseMirror ul, .ProseMirror ol, .ProseMirror blockquote {
-  position: relative;
-  margin: 1em 0;
-}
-`;
+// Добавляем новое расширение для обработки CSS классов в HTML
+const AllowClassesOnNodes = Extension.create({
+  name: 'allowClassesOnNodes',
+  
+  addGlobalAttributes() {
+    return [
+      {
+        types: [
+          'paragraph',
+          'heading',
+          'blockquote',
+          'bulletList',
+          'orderedList',
+          'listItem',
+          'codeBlock',
+          'horizontalRule',
+          'image',
+        ],
+        attributes: {
+          class: {
+            default: null,
+          },
+          style: {
+            default: null,
+          },
+          id: {
+            default: null,
+          },
+        },
+      },
+      {
+        types: ['div', 'span'],
+        attributes: {
+          class: {
+            default: null,
+          },
+          style: {
+            default: null,
+          },
+          id: {
+            default: null,
+          },
+        },
+      },
+    ];
+  },
+});
 
 interface RichTextEditorProps {
   content: string;
@@ -403,6 +344,18 @@ interface CustomEventMap {
 
 declare global {
   interface WindowEventMap extends CustomEventMap {}
+}
+
+// Расширяем типы команд TipTap
+declare module '@tiptap/core' {
+  interface Commands<ReturnType> {
+    insertStyledHtmlBlock: {
+      /**
+       * Вставляет HTML блок с сохранением стилей
+       */
+      insertStyledHtmlBlock: (html: string) => ReturnType;
+    };
+  }
 }
 
 export function RichTextEditor({
@@ -498,7 +451,7 @@ export function RichTextEditor({
       }),
       NewLineHandling,
       CodeBlockLowlight.configure({
-        lowlight,
+        lowlight: lowlightPlugin,
         HTMLAttributes: {
           class: 'bg-gray-100 dark:bg-gray-800 rounded-lg p-4 font-mono my-4'
         }
@@ -560,7 +513,8 @@ export function RichTextEditor({
           class: 'flex items-start my-2'
         },
         nested: true
-      })
+      }),
+      AllowClassesOnNodes,
     ],
     content,
     editable: true,
@@ -773,9 +727,49 @@ export function RichTextEditor({
     setShowBlockSelector(true);
   };
 
+  // Функция для обработки вставки HTML блоков с сохранением стилей
+  const insertStyledHtmlBlock = (editor: Editor, html: string): boolean => {
+    try {
+      // Преобразование HTML в DOM
+      const div = document.createElement('div');
+      div.innerHTML = html;
+      
+      // Применение дополнительной обработки, если необходимо
+      // Например, можно добавить дополнительные стили или атрибуты
+      
+      // Вставка HTML с сохранением всех атрибутов и стилей
+      editor.commands.insertContent({
+        type: 'doc',
+        content: [
+          {
+            type: 'html',
+            content: [
+              {
+                type: 'text',
+                text: html,
+              },
+            ],
+          },
+        ],
+      });
+      
+      return true;
+    } catch (error) {
+      console.error('Ошибка при вставке стилизованного HTML блока:', error);
+      return false;
+    }
+  };
+  
+  // Заменяем функцию insertContent в BlockSelector
+  useEffect(() => {
+    if (editor) {
+      // Предоставляем функцию insertStyledHtmlBlock через API редактора
+      editor.commands.insertStyledHtmlBlock = (html: string) => insertStyledHtmlBlock(editor, html);
+    }
+  }, [editor]);
+
   return (
     <div className={withBackground ? "bg-white dark:bg-gray-800 rounded-xl p-8" : ""}>
-      <style>{editorStyles}</style>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
           {title}
