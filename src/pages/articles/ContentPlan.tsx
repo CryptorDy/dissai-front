@@ -14,7 +14,7 @@ import { useNavigate } from 'react-router-dom';
 
 function ContentPlan() {
   const navigate = useNavigate();
-  const { showSuccess, showError } = useToast();
+  const { showError } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [content, setContent] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -80,7 +80,6 @@ function ContentPlan() {
 
         await knowledgeApi.saveItem(newItem);
         navigate('/knowledge');
-        showSuccess('Контент-план успешно сохранен в базе знаний');
         setShowSaveDialog(false);
       } catch (error) {
         console.error('Failed to save content plan:', error);

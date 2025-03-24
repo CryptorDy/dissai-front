@@ -1,0 +1,716 @@
+/* Стили для блочных элементов */
+.ProseMirror blockquote {
+  border-left: 4px solid #ccc;
+  padding-left: 1em;
+  margin-left: 0;
+  margin-right: 0;
+  font-style: italic;
+}
+
+.ProseMirror ul, .ProseMirror ol {
+  padding-left: 1em;
+  margin-bottom: 1em;
+}
+
+.ProseMirror li {
+  margin-bottom: 0.5em;
+}
+  
+.ProseMirror a {
+  color: #1a73e8;
+  text-decoration: none;
+}
+  
+.ProseMirror a:hover {
+  text-decoration: underline;
+}
+  
+/* Стили для вставляемых блоков */
+.ProseMirror .grid {
+  display: grid;
+}
+  
+.ProseMirror .grid-cols-1 {
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+  
+.ProseMirror .md\:grid-cols-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+  
+.ProseMirror .md\:grid-cols-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+  
+.ProseMirror .gap-2 {
+  gap: 0.5rem;
+}
+  
+.ProseMirror .gap-4 {
+  gap: 1rem;
+}
+  
+.ProseMirror .my-4 {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}
+  
+.ProseMirror .my-2 {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+  
+.ProseMirror .p-4 {
+  padding: 1rem;
+}
+  
+.ProseMirror .p-6 {
+  padding: 1.5rem;
+}
+  
+.ProseMirror .p-2 {
+  padding: 0.5rem;
+}
+  
+.ProseMirror .pl-4 {
+  padding-left: 1rem;
+}
+  
+.ProseMirror .pl-6 {
+  padding-left: 1.5rem;
+}
+  
+.ProseMirror .px-1 {
+  padding-left: 0.25rem;
+  padding-right: 0.25rem;
+}
+  
+.ProseMirror .px-4 {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+  
+.ProseMirror .py-0\.5 {
+  padding-top: 0.125rem;
+  padding-bottom: 0.125rem;
+}
+  
+.ProseMirror .py-2 {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+  
+.ProseMirror .rounded-md {
+  border-radius: 0.375rem;
+}
+  
+.ProseMirror .rounded-lg {
+  border-radius: 0.5rem;
+}
+  
+.ProseMirror .rounded-full {
+  border-radius: 9999px;
+}
+  
+.ProseMirror .rounded {
+  border-radius: 0.25rem;
+}
+  
+.ProseMirror .rounded-r-md {
+  border-top-right-radius: 0.375rem;
+  border-bottom-right-radius: 0.375rem;
+}
+  
+.ProseMirror .border {
+  border-width: 1px;
+}
+  
+.ProseMirror .border-l-4 {
+  border-left-width: 4px;
+}
+  
+.ProseMirror .border-l-2 {
+  border-left-width: 2px;
+}
+  
+.ProseMirror .border-t {
+  border-top-width: 1px;
+}
+  
+.ProseMirror .border-b {
+  border-bottom-width: 1px;
+}
+  
+.ProseMirror .last\:border-b-0:last-child {
+  border-bottom-width: 0px;
+}
+  
+.ProseMirror .border-gray-200 {
+  border-color: rgb(229, 231, 235);
+}
+  
+.ProseMirror .border-purple-500 {
+  border-color: rgb(168, 85, 247);
+}
+  
+.ProseMirror .border-indigo-200 {
+  border-color: rgb(199, 210, 254);
+}
+  
+.ProseMirror .border-green-500 {
+  border-color: rgb(34, 197, 94);
+}
+  
+.ProseMirror .border-yellow-200 {
+  border-color: rgb(254, 240, 138);
+}
+  
+.ProseMirror .border-rose-200 {
+  border-color: rgb(254, 205, 211);
+}
+  
+.ProseMirror .bg-white {
+  background-color: rgb(255, 255, 255);
+}
+  
+.ProseMirror .bg-gray-50 {
+  background-color: rgb(249, 250, 251);
+}
+  
+.ProseMirror .bg-gray-100 {
+  background-color: rgb(243, 244, 246);
+}
+  
+.ProseMirror .bg-gray-200 {
+  background-color: rgb(229, 231, 235);
+}
+  
+.ProseMirror .bg-purple-50 {
+  background-color: rgb(250, 245, 255);
+}
+  
+.ProseMirror .bg-emerald-500 {
+  background-color: rgb(16, 185, 129);
+}
+  
+.ProseMirror .bg-indigo-50 {
+  background-color: rgb(238, 242, 255);
+}
+  
+.ProseMirror .bg-blue-100 {
+  background-color: rgb(219, 234, 254);
+}
+  
+.ProseMirror .bg-blue-600 {
+  background-color: rgb(37, 99, 235);
+}
+  
+.ProseMirror .bg-yellow-50 {
+  background-color: rgb(254, 252, 232);
+}
+  
+.ProseMirror .bg-emerald-100 {
+  background-color: rgb(209, 250, 229);
+}
+  
+.ProseMirror .bg-amber-100 {
+  background-color: rgb(254, 243, 199);
+}
+  
+.ProseMirror .bg-violet-100 {
+  background-color: rgb(237, 233, 254);
+}
+  
+.ProseMirror .bg-rose-50 {
+  background-color: rgb(255, 241, 242);
+}
+  
+.ProseMirror .bg-teal-100 {
+  background-color: rgb(204, 251, 241);
+}
+  
+.ProseMirror .bg-white\/20 {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+  
+.ProseMirror .text-sm {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+  
+.ProseMirror .text-xs {
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+  
+.ProseMirror .text-base {
+  font-size: 1rem;
+  line-height: 1.5rem;
+}
+  
+.ProseMirror .text-xl {
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+}
+  
+.ProseMirror .text-2xl {
+  font-size: 1.5rem;
+  line-height: 2rem;
+}
+  
+.ProseMirror .text-white {
+  color: rgb(255, 255, 255);
+}
+  
+.ProseMirror .text-gray-900 {
+  color: rgb(17, 24, 39);
+}
+  
+.ProseMirror .text-gray-700 {
+  color: rgb(55, 65, 81);
+}
+  
+.ProseMirror .text-gray-600 {
+  color: rgb(75, 85, 99);
+}
+  
+.ProseMirror .text-gray-500 {
+  color: rgb(107, 114, 128);
+}
+  
+.ProseMirror .text-gray-400 {
+  color: rgb(156, 163, 175);
+}
+  
+.ProseMirror .text-indigo-700 {
+  color: rgb(67, 56, 202);
+}
+  
+.ProseMirror .text-indigo-500 {
+  color: rgb(99, 102, 241);
+}
+  
+.ProseMirror .text-emerald-500 {
+  color: rgb(16, 185, 129);
+}
+  
+.ProseMirror .text-green-500 {
+  color: rgb(34, 197, 94);
+}
+  
+.ProseMirror .text-green-700 {
+  color: rgb(21, 128, 61);
+}
+  
+.ProseMirror .text-blue-600 {
+  color: rgb(37, 99, 235);
+}
+  
+.ProseMirror .text-blue-500 {
+  color: rgb(59, 130, 246);
+}
+  
+.ProseMirror .text-cyan-500 {
+  color: rgb(6, 182, 212);
+}
+  
+.ProseMirror .text-purple-500 {
+  color: rgb(168, 85, 247);
+}
+  
+.ProseMirror .text-yellow-800 {
+  color: rgb(133, 77, 14);
+}
+  
+.ProseMirror .text-yellow-700 {
+  color: rgb(161, 98, 7);
+}
+  
+.ProseMirror .text-yellow-500 {
+  color: rgb(234, 179, 8);
+}
+  
+.ProseMirror .text-rose-700 {
+  color: rgb(190, 18, 60);
+}
+  
+.ProseMirror .text-rose-600 {
+  color: rgb(225, 29, 72);
+}
+  
+.ProseMirror .text-rose-500 {
+  color: rgb(244, 63, 94);
+}
+  
+.ProseMirror .text-teal-800 {
+  color: rgb(17, 94, 89);
+}
+  
+.ProseMirror .text-red-500 {
+  color: rgb(239, 68, 68);
+}
+  
+.ProseMirror .text-violet-500 {
+  color: rgb(139, 92, 246);
+}
+  
+.ProseMirror .text-amber-500 {
+  color: rgb(245, 158, 11);
+}
+  
+.ProseMirror .text-white\/90 {
+  color: rgba(255, 255, 255, 0.9);
+}
+  
+.ProseMirror .font-bold {
+  font-weight: 700;
+}
+  
+.ProseMirror .font-medium {
+  font-weight: 500;
+}
+  
+.ProseMirror .italic {
+  font-style: italic;
+}
+  
+.ProseMirror .leading-relaxed {
+  line-height: 1.625;
+}
+  
+.ProseMirror .shadow {
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+}
+  
+.ProseMirror .shadow-md {
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+  
+.ProseMirror .shadow-sm {
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+}
+  
+.ProseMirror .overflow-hidden {
+  overflow: hidden;
+}
+  
+.ProseMirror .relative {
+  position: relative;
+}
+  
+.ProseMirror .absolute {
+  position: absolute;
+}
+  
+.ProseMirror .z-10 {
+  z-index: 10;
+}
+  
+.ProseMirror .-left-1\.5 {
+  left: -0.375rem;
+}
+  
+.ProseMirror .flex {
+  display: flex;
+}
+  
+.ProseMirror .inline-flex {
+  display: inline-flex;
+}
+  
+.ProseMirror .inline-block {
+  display: inline-block;
+}
+  
+.ProseMirror .flex-shrink-0 {
+  flex-shrink: 0;
+}
+  
+.ProseMirror .items-center {
+  align-items: center;
+}
+  
+.ProseMirror .items-start {
+  align-items: flex-start;
+}
+  
+.ProseMirror .justify-center {
+  justify-content: center;
+}
+  
+.ProseMirror .justify-between {
+  justify-content: space-between;
+}
+  
+.ProseMirror .space-y-2 > * + * {
+  margin-top: 0.5rem;
+}
+  
+.ProseMirror .space-y-4 > * + * {
+  margin-top: 1rem;
+}
+  
+.ProseMirror .space-y-6 > * + * {
+  margin-top: 1.5rem;
+}
+  
+.ProseMirror .ml-2 {
+  margin-left: 0.5rem;
+}
+  
+.ProseMirror .ml-3 {
+  margin-left: 0.75rem;
+}
+  
+.ProseMirror .mr-1 {
+  margin-right: 0.25rem;
+}
+  
+.ProseMirror .mr-2 {
+  margin-right: 0.5rem;
+}
+  
+.ProseMirror .mr-3 {
+  margin-right: 0.75rem;
+}
+  
+.ProseMirror .mt-0\.5 {
+  margin-top: 0.125rem;
+}
+  
+.ProseMirror .mt-1 {
+  margin-top: 0.25rem;
+}
+  
+.ProseMirror .mt-2 {
+  margin-top: 0.5rem;
+}
+  
+.ProseMirror .mt-4 {
+  margin-top: 1rem;
+}
+  
+.ProseMirror .mb-1 {
+  margin-bottom: 0.25rem;
+}
+  
+.ProseMirror .mb-2 {
+  margin-bottom: 0.5rem;
+}
+  
+.ProseMirror .mb-4 {
+  margin-bottom: 1rem;
+}
+  
+.ProseMirror .h-2 {
+  height: 0.5rem;
+}
+  
+.ProseMirror .h-3 {
+  height: 0.75rem;
+}
+  
+.ProseMirror .h-5 {
+  height: 1.25rem;
+}
+  
+.ProseMirror .h-6 {
+  height: 1.5rem;
+}
+  
+.ProseMirror .h-full {
+  height: 100%;
+}
+  
+.ProseMirror .w-3 {
+  width: 0.75rem;
+}
+  
+.ProseMirror .w-4 {
+  width: 1rem;
+}
+  
+.ProseMirror .w-5 {
+  width: 1.25rem;
+}
+  
+.ProseMirror .w-6 {
+  width: 1.5rem;
+}
+  
+.ProseMirror .w-full {
+  width: 100%;
+}
+  
+.ProseMirror .transition-colors {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+  transition-duration: 150ms;
+}
+  
+.ProseMirror .aspect-\[4\/3\] {
+  aspect-ratio: 4 / 3;
+}
+  
+.ProseMirror .object-cover {
+  object-fit: cover;
+}
+  
+.ProseMirror .line-through {
+  text-decoration: line-through;
+}
+  
+.ProseMirror .backdrop-blur-sm {
+  backdrop-filter: blur(4px);
+}
+  
+.ProseMirror .hover\:bg-blue-700:hover {
+  background-color: rgb(29, 78, 216);
+}
+  
+.ProseMirror .hover\:bg-white\/30:hover {
+  background-color: rgba(255, 255, 255, 0.3);
+}
+  
+.ProseMirror .hover\:underline:hover {
+  text-decoration: underline;
+}
+  
+/* Стили для Tailwind в темном режиме */
+.dark .ProseMirror .dark\:bg-gray-800 {
+  background-color: rgb(31, 41, 55);
+}
+  
+.dark .ProseMirror .dark\:bg-gray-700 {
+  background-color: rgb(55, 65, 81);
+}
+  
+.dark .ProseMirror .dark\:bg-gray-900 {
+  background-color: rgb(17, 24, 39);
+}
+  
+.dark .ProseMirror .dark\:bg-blue-900 {
+  background-color: rgb(30, 58, 138);
+}
+  
+.dark .ProseMirror .dark\:bg-indigo-900\/20 {
+  background-color: rgba(49, 46, 129, 0.2);
+}
+  
+.dark .ProseMirror .dark\:bg-green-900\/20 {
+  background-color: rgba(20, 83, 45, 0.2);
+}
+  
+.dark .ProseMirror .dark\:bg-yellow-900\/20 {
+  background-color: rgba(113, 63, 18, 0.2);
+}
+  
+.dark .ProseMirror .dark\:bg-rose-900\/20 {
+  background-color: rgba(136, 19, 55, 0.2);
+}
+  
+.dark .ProseMirror .dark\:bg-purple-900\/20 {
+  background-color: rgba(88, 28, 135, 0.2);
+}
+  
+.dark .ProseMirror .dark\:bg-violet-900\/20 {
+  background-color: rgba(76, 29, 149, 0.2);
+}
+  
+.dark .ProseMirror .dark\:bg-emerald-900\/20 {
+  background-color: rgba(6, 78, 59, 0.2);
+}
+  
+.dark .ProseMirror .dark\:bg-amber-900\/20 {
+  background-color: rgba(120, 53, 15, 0.2);
+}
+  
+.dark .ProseMirror .dark\:bg-teal-900\/40 {
+  background-color: rgba(19, 78, 74, 0.4);
+}
+  
+.dark .ProseMirror .dark\:text-white {
+  color: rgb(255, 255, 255);
+}
+  
+.dark .ProseMirror .dark\:text-gray-300 {
+  color: rgb(209, 213, 219);
+}
+  
+.dark .ProseMirror .dark\:text-gray-400 {
+  color: rgb(156, 163, 175);
+}
+  
+.dark .ProseMirror .dark\:text-indigo-300 {
+  color: rgb(165, 180, 252);
+}
+  
+.dark .ProseMirror .dark\:text-blue-300 {
+  color: rgb(147, 197, 253);
+}
+  
+.dark .ProseMirror .dark\:text-blue-400 {
+  color: rgb(96, 165, 250);
+}
+  
+.dark .ProseMirror .dark\:text-green-300 {
+  color: rgb(134, 239, 172);
+}
+  
+.dark .ProseMirror .dark\:text-yellow-300 {
+  color: rgb(253, 224, 71);
+}
+  
+.dark .ProseMirror .dark\:text-yellow-200 {
+  color: rgb(254, 240, 138);
+}
+  
+.dark .ProseMirror .dark\:text-rose-300 {
+  color: rgb(253, 164, 175);
+}
+  
+.dark .ProseMirror .dark\:text-rose-200 {
+  color: rgb(254, 205, 211);
+}
+  
+.dark .ProseMirror .dark\:text-teal-200 {
+  color: rgb(153, 246, 228);
+}
+  
+.dark .ProseMirror .dark\:border-gray-700 {
+  border-color: rgb(55, 65, 81);
+}
+  
+.dark .ProseMirror .dark\:border-indigo-800 {
+  border-color: rgb(55, 48, 163);
+}
+  
+.dark .ProseMirror .dark\:border-green-800 {
+  border-color: rgb(22, 101, 52);
+}
+  
+.dark .ProseMirror .dark\:border-purple-800 {
+  border-color: rgb(107, 33, 168);
+}
+  
+.dark .ProseMirror .dark\:border-yellow-800 {
+  border-color: rgb(133, 77, 14);
+}
+  
+.dark .ProseMirror .dark\:border-rose-800 {
+  border-color: rgb(159, 18, 57);
+}
+  
+.dark .ProseMirror .dark\:hover\:bg-gray-700:hover {
+  background-color: rgb(55, 65, 81);
+}
+  
+/* Медиа запрос для добавления Grid стилей на рабочем столе */
+@media (min-width: 768px) {
+  .ProseMirror .md\:grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  
+  .ProseMirror .md\:grid-cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+} 

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useEditor, EditorContent } from '@tiptap/react';
+import { useEditor, EditorContent, Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import Table from '@tiptap/extension-table';
@@ -18,39 +18,403 @@ import Superscript from '@tiptap/extension-superscript';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
+import Placeholder from '@tiptap/extension-placeholder';
 import { common, createLowlight } from 'lowlight';
-import { Edit2, FileDown, Eye, Plus } from 'lucide-react';
+import { FileDown, Plus, X, Type, Grid2x2 } from 'lucide-react';
 import { Toolbar } from './editor/Toolbar';
 import { BlockSelector } from './editor/BlockSelector';
+import { BlockSelector as HtmlBlockSelector } from './editor/BlockHtmlSelector';
+import { Extension } from '@tiptap/core';
+import { Plugin } from 'prosemirror-state';
+import { Decoration, DecorationSet } from 'prosemirror-view';
+import ListItem from '@tiptap/extension-list-item';
+import Dropcursor from '@tiptap/extension-dropcursor';
+import Document from '@tiptap/extension-document';
 
-const lowlight = createLowlight(common);
+// Импорт стилей из внешних файлов
+import './editor/styles/editorStyles.css';
+import './editor/styles/blockStyles.css';
+
+// Инициализация lowlight для подсветки синтаксиса
+const lowlightPlugin = createLowlight(common);
+
+// Интерфейс для компонента меню блока
+interface BlockMenuProps {
+  isOpen: boolean;
+  onClose: () => void;
+  position: { x: number; y: number };
+  editor: Editor;
+}
+
+// Модальное окно для выбора блока
+const BlockMenu = ({ isOpen, onClose, position, editor }: BlockMenuProps) => {
+  if (!isOpen) return null;
+
+  const handleAddBlock = (type: string) => {
+    // Добавляем выбранный тип блока
+    switch(type) {
+      case 'heading1':
+        editor.chain().focus().toggleHeading({ level: 1 }).run();
+        break;
+      case 'heading2':
+        editor.chain().focus().toggleHeading({ level: 2 }).run();
+        break;
+      case 'heading3':
+        editor.chain().focus().toggleHeading({ level: 3 }).run();
+        break;
+      case 'bulletList':
+        editor.chain().focus().toggleBulletList().run();
+        break;
+      case 'orderedList':
+        editor.chain().focus().toggleOrderedList().run();
+        break;
+      case 'taskList':
+        editor.chain().focus().toggleTaskList().run();
+        break;
+      case 'blockquote':
+        editor.chain().focus().toggleBlockquote().run();
+        break;
+      case 'codeBlock':
+        editor.chain().focus().toggleCodeBlock().run();
+        break;
+      case 'horizontalRule':
+        editor.chain().focus().setHorizontalRule().run();
+        break;
+      case 'table':
+        editor.chain().focus()
+          .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
+          .run();
+        break;
+      case 'image':
+        const url = window.prompt('URL изображения');
+        if (url) {
+          editor.chain().focus().setImage({ src: url }).run();
+        }
+        break;
+      default:
+        break;
+    }
+    onClose();
+  };
+
+  return (
+    <div 
+      className="block-menu"
+      style={{
+        position: 'absolute',
+        left: `${position.x}px`,
+        top: `${position.y}px`,
+        zIndex: 50,
+      }}
+    >
+      <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+        <div className="p-2">
+          <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 px-2 py-1">
+            Блоки
+          </h3>
+          
+          <div className="grid grid-cols-1 gap-1 mt-1">
+            <button 
+              className="flex items-center text-left rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-700"
+              onClick={() => handleAddBlock('heading1')}
+            >
+              <span className="text-xl font-bold">H1</span>
+              <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Заголовок 1</span>
+            </button>
+            
+            <button 
+              className="flex items-center text-left rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-700"
+              onClick={() => handleAddBlock('heading2')}
+            >
+              <span className="text-lg font-bold">H2</span>
+              <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Заголовок 2</span>
+            </button>
+            
+            <button 
+              className="flex items-center text-left rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-700"
+              onClick={() => handleAddBlock('heading3')}
+            >
+              <span className="text-base font-bold">H3</span>
+              <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Заголовок 3</span>
+            </button>
+
+            <div className="my-1 border-t border-gray-200 dark:border-gray-700"></div>
+            
+            <button 
+              className="flex items-center text-left rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-700"
+              onClick={() => handleAddBlock('bulletList')}
+            >
+              <span className="text-lg">•</span>
+              <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Маркированный список</span>
+            </button>
+            
+            <button 
+              className="flex items-center text-left rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-700"
+              onClick={() => handleAddBlock('orderedList')}
+            >
+              <span className="text-lg">1.</span>
+              <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Нумерованный список</span>
+            </button>
+            
+            <button 
+              className="flex items-center text-left rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-700"
+              onClick={() => handleAddBlock('taskList')}
+            >
+              <span className="text-lg">☐</span>
+              <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Список задач</span>
+            </button>
+
+            <div className="my-1 border-t border-gray-200 dark:border-gray-700"></div>
+            
+            <button 
+              className="flex items-center text-left rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-700"
+              onClick={() => handleAddBlock('blockquote')}
+            >
+              <span className="text-lg">"</span>
+              <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Цитата</span>
+            </button>
+            
+            <button 
+              className="flex items-center text-left rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-700"
+              onClick={() => handleAddBlock('codeBlock')}
+            >
+              <span className="text-lg">{`</>`}</span>
+              <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Блок кода</span>
+            </button>
+
+            <button 
+              className="flex items-center text-left rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-700"
+              onClick={() => handleAddBlock('horizontalRule')}
+            >
+              <span className="text-lg">—</span>
+              <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Горизонтальная линия</span>
+            </button>
+
+            <button 
+              className="flex items-center text-left rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-700"
+              onClick={() => handleAddBlock('table')}
+            >
+              <span className="text-lg">⊞</span>
+              <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Таблица</span>
+            </button>
+            
+            <button 
+              className="flex items-center text-left rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-700"
+              onClick={() => handleAddBlock('image')}
+            >
+              <span className="text-lg">🖼️</span>
+              <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Изображение</span>
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      <div 
+        className="fixed inset-0 z-40" 
+        onClick={onClose}
+      />
+    </div>
+  );
+};
+
+// Создаем расширение для работы с новой строкой и меню блока
+const NewLineHandling = Extension.create({
+  name: 'newLineHandling',
+  
+  addKeyboardShortcuts() {
+    return {
+      Enter: () => {
+        const { selection } = this.editor.state;
+        const { $anchor, empty } = selection;
+        
+        // Если курсор находится в пустом параграфе, создаем новый пустой
+        if (empty && $anchor.parent.type.name === 'paragraph' && $anchor.parent.textContent === '') {
+          return this.editor.chain().focus().createParagraphNear().run();
+        }
+        
+        // Если курсор находится в конце параграфа (не пустого), также создаем новый параграф
+        if ($anchor.pos === $anchor.end() && !empty) {
+          return this.editor.chain().focus().createParagraphNear().run();
+        }
+        
+        // Иначе просто новая строка
+        return false;
+      }
+    };
+  },
+  
+  // Добавляем обработку автоматического создания новой строки при достижении конца документа
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        props: {
+          handleClick: (view, pos, event) => {
+            // Определяем, что клик произошел за последним содержимым (в пустой области редактора)
+            const { state } = view;
+            const docSize = state.doc.content.size;
+            
+            // Если клик после последнего содержимого документа
+            if (pos >= docSize - 2) {
+              // Создаем новый пустой параграф и устанавливаем курсор
+              this.editor.chain()
+                .insertContentAt(docSize - 1, '<p></p>')
+                .focus(docSize + 1)
+                .run();
+                
+              return true;
+            }
+            
+            return false;
+          }
+        }
+      })
+    ];
+  }
+});
+
+// Добавляем новое расширение для обработки CSS классов в HTML
+const AllowClassesOnNodes = Extension.create({
+  name: 'allowClassesOnNodes',
+  
+  addGlobalAttributes() {
+    return [
+      {
+        types: [
+          'paragraph',
+          'heading',
+          'blockquote',
+          'bulletList',
+          'orderedList',
+          'listItem',
+          'codeBlock',
+          'horizontalRule',
+          'image',
+        ],
+        attributes: {
+          class: {
+            default: null,
+          },
+          style: {
+            default: null,
+          },
+          id: {
+            default: null,
+          },
+        },
+      },
+      {
+        types: ['div', 'span'],
+        attributes: {
+          class: {
+            default: null,
+          },
+          style: {
+            default: null,
+          },
+          id: {
+            default: null,
+          },
+        },
+      },
+    ];
+  },
+});
 
 interface RichTextEditorProps {
   content: string;
-  isEditing: boolean;
-  onEdit: () => void;
-  onSave: () => void;
+  onSave: (targetFolderId?: string | null, fileName?: string) => void;
   onChange: (value: string) => void;
   title?: string;
   withBackground?: boolean;
   format?: 'html' | 'markdown';
   itemId?: string;
+  onEdit?: () => void;
+  isEditing?: boolean;
+  autoSave?: boolean;
+}
+
+// Расширяем интерфейс для пользовательских событий
+interface CustomEventMap {
+  'block-menu-open': CustomEvent<{
+    x: number;
+    y: number;
+    position: number;
+  }>;
+}
+
+declare global {
+  interface WindowEventMap extends CustomEventMap {}
+}
+
+// Расширяем типы команд TipTap
+declare module '@tiptap/core' {
+  interface Commands<ReturnType> {
+    insertStyledHtmlBlock: {
+      /**
+       * Вставляет HTML блок с сохранением стилей
+       */
+      insertStyledHtmlBlock: (html: string) => ReturnType;
+    };
+  }
 }
 
 export function RichTextEditor({
   content,
-  isEditing,
-  onEdit,
   onSave,
   onChange,
-  title = 'Редактор',
+  title,
   withBackground = true,
   format = 'html',
-  itemId
+  itemId,
+  onEdit,
+  isEditing = true,
+  autoSave = true
 }: RichTextEditorProps) {
   const [showBlockSelector, setShowBlockSelector] = useState(false);
   const [blockSelectorPosition, setBlockSelectorPosition] = useState({ x: 0, y: 0 });
+  const [selectionCoords, setSelectionCoords] = useState<{ x: number; y: number } | null>(null);
   const floatingButtonRef = useRef<HTMLButtonElement>(null);
+  const editorContentRef = useRef<HTMLDivElement>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
+  
+  // Состояние для отображения меню блока (4 точек)
+  const [showHtmlBlockSelector, setShowHtmlBlockSelector] = useState(false);
+  const [htmlBlockSelectorPosition, setHtmlBlockSelectorPosition] = useState({ x: 0, y: 0 });
+
+  // Функция автосохранения с задержкой
+  const debouncedAutoSave = (html: string) => {
+    console.log('debouncedAutoSave вызвана, autoSave =', autoSave, 'itemId =', itemId);
+    
+    // Очищаем предыдущий таймер если он был
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+    
+    // Устанавливаем флаг о несохраненных изменениях
+    setIsDirty(true);
+    
+    // Устанавливаем новый таймер для автосохранения
+    autoSaveTimerRef.current = setTimeout(() => {
+      
+      if (autoSave && isDirty) {
+        // Вызываем сохранение - первым параметром явно передаем null, чтобы идентифицировать автосохранение
+        // Вторым параметром undefined, чтобы не передавать имя файла
+        onSave(null, undefined);
+        setIsDirty(false);
+      }
+    }, 400); // Задержка в 400 мс
+  };
+
+  // Очистка таймера при размонтировании компонента
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, []);
 
   const editor = useEditor({
     extensions: [
@@ -70,13 +434,24 @@ export function RichTextEditor({
         },
         codeBlock: false,
         paragraph: {
-          HTMLAttributes: {
-            class: 'text-gray-900 dark:text-gray-100 leading-normal'
-          }
+          HTMLAttributes: ({ node }: { node: { content: { size: number } } }) => ({
+            class: `text-gray-900 dark:text-gray-100 leading-normal ${node.content.size === 0 ? 'is-empty' : ''}`,
+          }),
         }
       }),
+      Placeholder.configure({
+        placeholder: ({ node }) => {
+          // Не показываем плейсхолдер, так как мы используем CSS
+          return '';
+        },
+        emptyEditorClass: 'is-editor-empty',
+        emptyNodeClass: 'is-empty',
+        showOnlyWhenEditable: true,
+        includeChildren: true,
+      }),
+      NewLineHandling,
       CodeBlockLowlight.configure({
-        lowlight,
+        lowlight: lowlightPlugin,
         HTMLAttributes: {
           class: 'bg-gray-100 dark:bg-gray-800 rounded-lg p-4 font-mono my-4'
         }
@@ -138,22 +513,157 @@ export function RichTextEditor({
           class: 'flex items-start my-2'
         },
         nested: true
-      })
+      }),
+      AllowClassesOnNodes,
     ],
     content,
-    editable: isEditing,
+    editable: true,
     onUpdate: ({ editor }) => {
-      onChange(editor.getHTML());
-    }
+      const html = editor.getHTML();
+      
+      // Проверяем, что содержимое действительно изменилось
+      if (html !== content) {
+        onChange(html);
+        
+        // Запускаем автосохранение при изменении
+        if (autoSave) {
+          debouncedAutoSave(html);
+        } else {
+        }
+      }
+    },
+    autofocus: 'end',
   });
 
+  // Добавляем обработчик события выделения текста и клика на иконку
   useEffect(() => {
-    if (editor && !isEditing) {
-      editor.setEditable(false);
-    } else if (editor && isEditing) {
-      editor.setEditable(true);
+    if (!editor || !editorContentRef.current) return;
+
+    // Функция для определения координат выделения
+    const handleSelectionChange = () => {
+      if (editor.view.hasFocus() && !editor.state.selection.empty) {
+        // Получаем текущее выделение
+        const { from, to } = editor.state.selection;
+        
+        // Если есть выделение
+        if (from !== to) {
+          try {
+            const view = editor.view;
+            
+            // Получаем DOM-селекцию для более точного позиционирования
+            const selection = window.getSelection();
+            if (!selection || selection.rangeCount === 0) return;
+            
+            const range = selection.getRangeAt(0);
+            const rect = range.getBoundingClientRect();
+            
+            // Используем rect для получения точных координат выделенного текста
+            const centerX = rect.left + rect.width / 2;
+            
+            // Вычисляем отступ от верха выделения (сразу над текстом)
+            const topOffset = rect.top - 94; // 65px над текстом
+            
+            // Устанавливаем координаты для отображения панели
+            setSelectionCoords({ 
+              x: centerX, 
+              y: topOffset
+            });
+          } catch (error) {
+            console.error('Error getting selection coordinates:', error);
+            setSelectionCoords(null);
+          }
+        }
+      } else {
+        // Если нет выделения, скрываем панель
+        setSelectionCoords(null);
+      }
+    };
+
+    // Обработчик клика на иконку меню (4 точек) перед параграфом
+    const handleEditorClick = (e: Event) => {
+      const mouseEvent = e as MouseEvent;
+      const target = mouseEvent.target as HTMLElement;
+      const rect = target.getBoundingClientRect();
+      
+      // Определяем, был ли клик на иконке меню (перед параграфом)
+      // Проверяем позицию клика относительно левого края параграфа
+      if (target.tagName === 'P' && mouseEvent.clientX < rect.left && mouseEvent.clientX > rect.left - 30) {
+        // Находим позицию ноды в редакторе
+        const pos = editor.view.posAtDOM(target, 0);
+        if (pos !== null) {
+          // Устанавливаем выделение на этот параграф
+          editor.commands.setTextSelection(pos);
+          
+          // Открываем HtmlBlockSelector вместо BlockSelector
+          setHtmlBlockSelectorPosition({ 
+            x: rect.left, 
+            y: rect.top 
+          });
+          setShowHtmlBlockSelector(true);
+          
+          mouseEvent.preventDefault();
+          mouseEvent.stopPropagation();
+        }
+      }
+    };
+
+    // Комбинированный обработчик для события клика
+    const handleCombinedClick = (e: Event) => {
+      // Убираем setTimeout и вызываем напрямую
+      handleSelectionChange();
+      handleEditorClick(e);
+    };
+
+    // Добавляем слушатель события selectionchange
+    document.addEventListener('selectionchange', handleSelectionChange);
+    
+    // Добавляем слушатель клика для проверки выделения и для клика на иконке 4 точек
+    const editorEl = editorContentRef.current.querySelector('.ProseMirror');
+    editorEl?.addEventListener('click', handleCombinedClick);
+
+    return () => {
+      document.removeEventListener('selectionchange', handleSelectionChange);
+      const editorEl = editorContentRef.current?.querySelector('.ProseMirror');
+      editorEl?.removeEventListener('click', handleCombinedClick);
+    };
+  }, [editor]);
+
+  // Сохраняем содержимое при обновлении props
+  useEffect(() => {
+    if (editor) {
+      const currentContent = editor.getHTML();
+      
+      // Если изменился itemId, значит загружен новый файл - принудительно обновляем содержимое
+      if (editor && itemId) {
+        editor.commands.setContent(content || '<p></p>');
+        return;
+      }
+      
+      // Если текущее содержимое редактора отличается от пришедшего в props,
+      // и редактор не пустой, сохраняем текущее содержимое
+      if (currentContent && currentContent !== content && currentContent !== '<p></p>') {
+      } else {
+        // Иначе устанавливаем содержимое из props
+        if (content !== currentContent) {
+          editor.commands.setContent(content || '<p></p>');
+        }
+      }
     }
-  }, [content, isEditing, editor]);
+  }, [content, itemId, editor]); // Реагируем на изменение content или itemId
+
+  // Фокус на последний пустой параграф при монтировании
+  useEffect(() => {
+    if (editor) {
+      editor.setEditable(true);
+      
+      // Проверяем, пуст ли редактор
+      if (editor.isEmpty) {
+        // Добавляем начальный пустой параграф, если редактор пуст
+        editor.commands.setContent('<p></p>');
+        editor.commands.focus('end');
+      }
+    }
+  }, [editor]); // Только при изменении самого editor
 
   const handleExportPDF = () => {
     if (!editor) return;
@@ -187,7 +697,7 @@ export function RichTextEditor({
     titleElement.style.fontWeight = 'bold';
     titleElement.style.marginBottom = '24px';
     titleElement.style.color = '#000000';
-    titleElement.textContent = title;
+    titleElement.textContent = title || 'Документ';
     
     element.appendChild(titleElement);
     
@@ -195,9 +705,10 @@ export function RichTextEditor({
     contentDiv.innerHTML = editor.getHTML();
     element.appendChild(contentDiv);
 
+    const documentTitle = title || 'document';
     const opt = {
       margin: 10,
-      filename: `${title.toLowerCase().replace(/\s+/g, '-')}.pdf`,
+      filename: `${documentTitle.toLowerCase().replace(/\s+/g, '-')}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 2 },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
@@ -208,65 +719,103 @@ export function RichTextEditor({
   };
 
   const handleOpenBlockSelector = () => {
+    // Открываем обычный BlockSelector для кнопки "+"
+    setBlockSelectorPosition({
+      x: Math.max(100, window.innerWidth - 300),
+      y: Math.max(100, window.innerHeight - 400)
+    });
     setShowBlockSelector(true);
   };
+
+  // Функция для обработки вставки HTML блоков с сохранением стилей
+  const insertStyledHtmlBlock = (editor: Editor, html: string): boolean => {
+    try {
+      // Преобразование HTML в DOM
+      const div = document.createElement('div');
+      div.innerHTML = html;
+      
+      // Применение дополнительной обработки, если необходимо
+      // Например, можно добавить дополнительные стили или атрибуты
+      
+      // Вставка HTML с сохранением всех атрибутов и стилей
+      editor.commands.insertContent({
+        type: 'doc',
+        content: [
+          {
+            type: 'html',
+            content: [
+              {
+                type: 'text',
+                text: html,
+              },
+            ],
+          },
+        ],
+      });
+      
+      return true;
+    } catch (error) {
+      console.error('Ошибка при вставке стилизованного HTML блока:', error);
+      return false;
+    }
+  };
+  
+  // Заменяем функцию insertContent в BlockSelector
+  useEffect(() => {
+    if (editor) {
+      // Предоставляем функцию insertStyledHtmlBlock через API редактора
+      editor.commands.insertStyledHtmlBlock = (html: string) => insertStyledHtmlBlock(editor, html);
+    }
+  }, [editor]);
 
   return (
     <div className={withBackground ? "bg-white dark:bg-gray-800 rounded-xl p-8" : ""}>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-          {isEditing ? `Редактирование: ${title}` : title}
+          {title}
         </h2>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={onEdit}
-            className="p-2 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-            title={isEditing ? 'Просмотр' : 'Редактировать'}
-          >
-            {isEditing ? <Eye className="w-4 h-4" /> : <Edit2 className="w-4 h-4" />}
-          </button>
-          <button
-            onClick={handleExportPDF}
-            className="p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-            title="Скачать PDF"
-          >
-            <FileDown className="w-4 h-4" />
-          </button>
-        </div>
       </div>
 
       <div className="relative">
-        {isEditing && editor && (
-          <Toolbar editor={editor} />
+        {editor && selectionCoords && (
+          <div 
+            ref={toolbarRef}
+            className="floating-toolbar"
+            style={{
+              position: 'fixed',
+              top: `${selectionCoords.y}px`,
+              left: `${selectionCoords.x}px`,
+              transform: 'translate(-50%, -100%)'
+            }}
+          >
+            <Toolbar editor={editor} />
+          </div>
         )}
 
-        <div className="prose dark:prose-invert max-w-none">
+        <div 
+          className="prose dark:prose-invert max-w-none" 
+          ref={editorContentRef}
+        >
           <EditorContent editor={editor} />
         </div>
-
-        {isEditing && (
-          <div className="h-[52px]" />
-        )}
       </div>
 
-      {isEditing && (
-        <button
-          ref={floatingButtonRef}
-          onClick={handleOpenBlockSelector}
-          className="fixed bottom-8 right-8 p-4 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
-          title="Добавить блок"
-        >
-          <Plus className="w-6 h-6" />
-        </button>
-      )}
-
-      {isEditing && editor && (
-        <BlockSelector
-          editor={editor}
-          isOpen={showBlockSelector}
-          onClose={() => setShowBlockSelector(false)}
-          position={blockSelectorPosition}
-        />
+      {editor && (
+        <>
+          <BlockSelector
+            editor={editor}
+            isOpen={showBlockSelector}
+            onClose={() => setShowBlockSelector(false)}
+            position={blockSelectorPosition}
+          />
+          
+          <HtmlBlockSelector
+            editor={editor}
+            isOpen={showHtmlBlockSelector}
+            onClose={() => setShowHtmlBlockSelector(false)}
+            position={htmlBlockSelectorPosition}
+          />
+        </>
       )}
     </div>
   );

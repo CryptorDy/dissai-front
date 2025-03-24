@@ -7,7 +7,7 @@ import { authService } from '../../services/authService';
 
 function SetupNickname() {
   const navigate = useNavigate();
-  const { showError, showSuccess } = useToast();
+  const { showError } = useToast();
   const { token } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [nickname, setNickname] = useState('');
@@ -25,8 +25,10 @@ function SetupNickname() {
 
     try {
       await authService.setNickname(nickname, token);
-      showSuccess('Никнейм успешно установлен');
-      navigate('/');
+      
+      // Используем абсолютный URL для гарантированного обновления
+      const baseUrl = window.location.origin;
+      window.location.href = `${baseUrl}/studio`;
     } catch (error: any) {
       showError(error.response?.data?.message || 'Ошибка при установке никнейма');
     } finally {

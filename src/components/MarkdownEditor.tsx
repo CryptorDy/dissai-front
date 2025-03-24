@@ -5,11 +5,12 @@ interface MarkdownEditorProps {
   content: string;
   isEditing: boolean;
   onEdit: () => void;
-  onSave: (targetFolderId?: string | null) => void;
+  onSave: (targetFolderId?: string | null, fileName?: string) => void;
   onChange: (value: string) => void;
   title?: string;
   height?: number;
   itemId?: string;
+  autoSave?: boolean;
 }
 
 export function MarkdownEditor({
@@ -18,9 +19,10 @@ export function MarkdownEditor({
   onEdit,
   onSave,
   onChange,
-  title = 'Редактор',
+  title,
   height = 500,
-  itemId
+  itemId,
+  autoSave
 }: MarkdownEditorProps) {
   return (
     <RichTextEditor
@@ -32,6 +34,7 @@ export function MarkdownEditor({
       title={title}
       itemId={itemId}
       format="html" // Всегда используем HTML формат
+      autoSave={autoSave}
     />
   );
 }

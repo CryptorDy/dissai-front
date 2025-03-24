@@ -5,7 +5,6 @@ import type { Toast as ToastType } from '../components/Toast';
 
 interface ToastContextType {
   showError: (message: string) => void;
-  showSuccess: (message: string) => void;
 }
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
@@ -28,12 +27,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     addToast('error', message);
   }, [addToast]);
 
-  const showSuccess = useCallback((message: string) => {
-    addToast('success', message);
-  }, [addToast]);
-
   return (
-    <ToastContext.Provider value={{ showError, showSuccess }}>
+    <ToastContext.Provider value={{ showError }}>
       {children}
       <div className="fixed bottom-4 right-4 z-50 space-y-2">
         <AnimatePresence mode="popLayout">

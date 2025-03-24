@@ -14,7 +14,7 @@ function ReelsTranscription() {
   const navigate = useNavigate();
   const { token } = useAuth();
   const { startGeneration, canAddTask } = useGeneration();
-  const { showSuccess, showError } = useToast();
+  const { showError } = useToast();
   const [activeTab, setActiveTab] = useState<TabType>('accounts');
   
   const [usernames, setUsernames] = useState<string[]>([]);
@@ -89,9 +89,10 @@ function ReelsTranscription() {
         throw new Error('Не получен ID задачи');
       }
 
-      startGeneration(data.taskId);
-      showSuccess('Анализ Reels начат');
-      navigate('/');
+      startGeneration(data.taskId, 'reels', 'Анализ аккаунтов Reels');
+      
+      const baseUrl = window.location.origin;
+      window.location.href = `${baseUrl}/studio`;
 
     } catch (error) {
       console.error('Error analyzing accounts:', error);
@@ -144,9 +145,10 @@ function ReelsTranscription() {
         throw new Error('Не получен ID задачи');
       }
 
-      startGeneration(data.taskId);
-      showSuccess('Анализ Reels начат');
-      navigate('/');
+      startGeneration(data.taskId, 'reels', 'Анализ Reels');
+      
+      const baseUrl = window.location.origin;
+      window.location.href = `${baseUrl}/studio`;
 
     } catch (error) {
       console.error('Error analyzing single reel:', error);

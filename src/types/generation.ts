@@ -1,6 +1,6 @@
 export type GenerationStatus = 'pending' | 'completed' | 'error' | 'cancelled';
 
-type GenerationType = 
+export type GenerationType = 
   | 'roadmap' 
   | 'reels' 
   | 'article' 
@@ -22,6 +22,8 @@ export interface GenerationTask {
   showResult?: boolean;
   canCancel?: boolean;
   redirected?: boolean;
+  name?: string;
+  isViewed?: boolean;
 }
 
 export interface TaskListResponse {

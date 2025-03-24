@@ -34,17 +34,17 @@ export function MoveDialog({ isOpen, onClose, onMove, items, currentItem }: Move
   }, [isOpen, onClose]);
 
   const renderFolderOption = (item: KnowledgeItem, level = 0) => {
-    if (item.id === currentItem.id || (item.type === 'folder' && item.id === currentItem.parentId)) {
+    if (item.id === currentItem.id || (item.itemType === 'folder' && item.id === currentItem.parentId)) {
       return null }
 
     // Если текущий элемент - Reels, показываем только папки и файлы типа Reels
-    if (currentItem.fileType === 'reels' && item.type === 'file' && item.fileType !== 'reels') {
+    if (currentItem.fileType === 'reels' && item.itemType === 'file' && item.fileType !== 'reels') {
       return null;
     }
 
     return (
       <div key={item.id}>
-        {item.type === 'folder' && (
+        {item.itemType === 'folder' && (
           <button
             onClick={() => setSelectedFolder(item.id)}
             className={`w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded flex items-center ${
@@ -56,9 +56,9 @@ export function MoveDialog({ isOpen, onClose, onMove, items, currentItem }: Move
             <span className="text-gray-900 dark:text-white">{item.name}</span>
           </button>
         )}
-        {item.type === 'folder' && item.children?.map(child => renderFolderOption(child, level + 1))}
+        {item.itemType === 'folder' && item.children?.map(child => renderFolderOption(child, level + 1))}
         {/* Показываем файлы только если это Reels и текущий элемент тоже Reels */}
-        {currentItem.fileType === 'reels' && item.type === 'file' && item.fileType === 'reels' && (
+        {currentItem.fileType === 'reels' && item.itemType === 'file' && item.fileType === 'reels' && (
           <button
             onClick={() => setSelectedFolder(item.id)}
             className={`w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded flex items-center ${
@@ -95,7 +95,7 @@ export function MoveDialog({ isOpen, onClose, onMove, items, currentItem }: Move
     
     // Рекурсивно ищем элемент по ID
     const selectedItem = findItemById(items, selectedFolder);
-    return selectedItem?.type === 'file' && selectedItem?.fileType === 'reels';
+    return selectedItem?.itemType === 'file' && selectedItem?.fileType === 'reels';
   };
 
   // Кнопка активна только если:
@@ -109,10 +109,10 @@ export function MoveDialog({ isOpen, onClose, onMove, items, currentItem }: Move
       } else {
         const selectedItem = findItemById(items, selectedFolder);
         // Для папки нужно имя новой статьи, для статьи Reels - не нужно
-        if (selectedItem?.type === 'folder') {
+        if (selectedItem?.itemType === 'folder') {
           return showNewFileInput && newFileName.trim().length > 0;
         } else {
-          return selectedItem?.type === 'file' && selectedItem?.fileType === 'reels';
+          return selectedItem?.itemType === 'file' && selectedItem?.fileType === 'reels';
         }
       }
     }
@@ -160,7 +160,7 @@ export function MoveDialog({ isOpen, onClose, onMove, items, currentItem }: Move
 
         {currentItem.fileType === 'reels' && (
           <div className="mb-4">
-            {(selectedFolder === null || (selectedFolder && findItemById(items, selectedFolder)?.type === 'folder')) && (
+            {(selectedFolder === null || (selectedFolder && findItemById(items, selectedFolder)?.itemType === 'folder')) && (
               <>
                 <button
                   onClick={() => setShowNewFileInput(!showNewFileInput)}

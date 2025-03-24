@@ -32,7 +32,7 @@ interface RoadmapData {
 function RoadmapResult() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { showSuccess, showError } = useToast();
+  const { showError } = useToast();
   const [roadmapData, setRoadmapData] = useState<RoadmapData | null>(null);
   const [completedTasks, setCompletedTasks] = useState<number[]>([]);
   const [isEditing, setIsEditing] = useState(false);
@@ -54,10 +54,12 @@ function RoadmapResult() {
             data = null;
           }
         }
+        
         // Если не удалось получить данные из content, проверяем прямые данные
         if (!data && location.state.goal && location.state.tasks) {
           data = location.state;
         }
+        
         // Если данные получены от api/knowledge/file
         else if (location.state.content) {
           try {
@@ -71,8 +73,32 @@ function RoadmapResult() {
         // Проверяем корректность данных
         if (data && data.goal && Array.isArray(data.tasks)) {
           console.log("Setting roadmap data:", data);
-          setRoadmapData(data);
-          setEditableContent(JSON.stringify(data, null, 2));
+          
+          // Преобразуем задачи для совместимости с интерфейсом RoadmapData
+          const processedData: RoadmapData = {
+            goal: data.goal,
+            tasks: data.tasks.map((task: any) => {
+              // Обрабатываем подзадачи, если они есть
+              const subtasks = task.subtasks && Array.isArray(task.subtasks) 
+                ? task.subtasks.map((subtask: any) => ({
+                    title: subtask.title,
+                    deadline: subtask.deadline,
+                    description: subtask.description,
+                    resources: subtask.resources || []
+                  }))
+                : [];
+              
+              return {
+                title: task.title,
+                deadline: task.deadline,
+                description: task.description,
+                subtasks
+              };
+            })
+          };
+          
+          setRoadmapData(processedData);
+          setEditableContent(JSON.stringify(processedData, null, 2));
         } else {
           // Если данные некорректные, перенаправляем на страницу создания
           console.error('Invalid roadmap data structure');
@@ -128,9 +154,10 @@ function RoadmapResult() {
     
     if (targetFolderId !== undefined && fileName) {
       try {
-        const newItem = {
-          type: 'file' as const,
-          fileType: 'roadmap-item' as const,
+        const newItem: KnowledgeItem = {
+          id: '', // ID будет присвоен на сервере
+          type: 'file',
+          fileType: 'roadmap-item',
           name: fileName,
           content,
           parentId: targetFolderId,
@@ -139,8 +166,7 @@ function RoadmapResult() {
           }
         };
 
-        await knowledgeApi.saveItem(newItem);
-        showSuccess('Родмап успешно сохранен в базе знаний');
+        await knowledgeApi.save(newItem);
         setShowSaveDialog(false);
         navigate('/knowledge');
       } catch (error) {

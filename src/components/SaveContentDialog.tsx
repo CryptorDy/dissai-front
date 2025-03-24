@@ -61,7 +61,7 @@ export function SaveContentDialog({
   };
 
   const renderFolderOption = (item: KnowledgeItem, level = 0) => {
-    if (item.type !== 'folder') return null;
+    if (item.itemType !== 'folder') return null;
 
     const isExpanded = expandedFolders.includes(item.id);
 
@@ -94,7 +94,7 @@ export function SaveContentDialog({
         
         {isExpanded && item.children && (
           <div>
-            {item.children.filter(child => child.type === 'folder').map(child => renderFolderOption(child, level + 1))}
+            {item.children.filter(child => child.itemType === 'folder').map(child => renderFolderOption(child, level + 1))}
           </div>
         )}
       </div>
