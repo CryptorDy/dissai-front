@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { NavigationMenu } from '../../components/NavigationMenu';
 import { ArticleCreationSteps } from '../../components/ArticleCreationSteps';
 import { ArticlePlan } from '../../components/ArticlePlan';
@@ -61,23 +61,41 @@ function RegularArticle() {
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [items, setItems] = useState<KnowledgeItem[]>([]);
   const [isLoadingItems, setIsLoadingItems] = useState(false);
+  const [articleTempId, setArticleTempId] = useState(`temp-article-${Date.now()}`);
+  const [articleName, setArticleName] = useState<string>('');
+
+  // Создаем memoized версию содержимого статьи,
+  // которая не зависит от изменений articleTempId
+  const articleContent = useMemo(() => {
+    return isEditing ? editableContent : generatedArticle;
+  }, [isEditing, editableContent, generatedArticle]);
 
   useEffect(() => {
-    // Загружаем список папок для диалога сохранения
-    const loadItems = async () => {
+    if (showSaveDialog) {
       setIsLoadingItems(true);
-      try {
-        const data = await knowledgeApi.getItems();
-        setItems(data);
-      } catch (error) {
-        console.error('Error loading folders:', error);
-      } finally {
-        setIsLoadingItems(false);
-      }
-    };
+      knowledgeApi.getItems()
+        .then(items => {
+          setItems(items.filter(item => item.itemType === 'folder'));
+          setIsLoadingItems(false);
+        })
+        .catch(error => {
+          console.error('Failed to load folders:', error);
+          showError('Ошибка при загрузке папок');
+          setIsLoadingItems(false);
+        });
+    }
+  }, [showSaveDialog, showError]);
 
-    loadItems();
-  }, []);
+  useEffect(() => {
+    if (currentView === 'article' && generatedArticle) {
+      setArticleTempId(`temp-article-${Date.now()}`);
+    }
+  }, [currentView, generatedArticle]);
+
+  useEffect(() => {
+    if (articleTempId && (editableContent || generatedArticle)) {
+    }
+  }, [articleTempId]);
 
   const handleInitialSubmit = async () => {
     setCurrentView('loading');
@@ -171,8 +189,8 @@ function RegularArticle() {
   };
 
   const handleGenerate = async () => {
-    setCurrentView('loading');
     try {
+      setCurrentView('loading');
       const response = await articleApi.submitPlan(chapters);
       
       if (response.step === 'article' && response.data.article) {
@@ -181,48 +199,127 @@ function RegularArticle() {
       }
     } catch (error) {
       console.error('Error generating article:', error);
-      // Обработка ошибки
+      showError('Ошибка при генерации статьи');
     }
   };
 
   const handleSave = async (targetFolderId?: string | null, fileName?: string) => {
-    const content = isEditing ? editableContent : generatedArticle;
     
-    if (targetFolderId !== undefined && fileName) {
-      try {
-        const newArticle: KnowledgeItem = {
-          id: `temp-file-${Date.now()}`,
-          itemType: 'file',
-          fileType: 'article',
-          name: fileName,
-          content: content,
-          parentId: targetFolderId,
-        };
-
-        // Создаем копию для отправки на сервер с пустым ID
-        const articleToSave = {
-          ...newArticle,
-          id: ''
-        };
-
-        console.log("Отправляем статью на сервер с пустым ID");
-        await knowledgeApi.save(articleToSave);
-        setShowSaveDialog(false);
-      } catch (error) {
-        console.error('Failed to save article:', error);
-        showError('Ошибка при сохранении статьи');
+    const content = articleContent;
+    
+    // Если targetFolderId = null и нет fileName, значит это автосохранение
+    const isAutoSave = targetFolderId === null && !fileName;
+    
+    try {
+      console.log('Создаем объект статьи');
+      
+      // Используем либо переданное имя файла, либо существующее имя статьи, либо тему, либо 'Новая статья'
+      const name = fileName || articleName || topic || 'Новая статья';
+      
+      // При автосохранении используем временный ID
+      const newArticle: KnowledgeItem = {
+        id: isAutoSave ? articleTempId : `temp-file-${Date.now()}`,
+        itemType: 'file',
+        fileType: 'article',
+        name: name,
+        content: content,
+        parentId: isAutoSave ? null : targetFolderId || null,
+      };
+      
+      // Обновляем название статьи в состоянии 
+      if (fileName && fileName !== articleName) {
+        setArticleName(fileName);
       }
-    } else if (!fileName) {
-      // Экспорт в файл
-      const blob = new Blob([content], { type: 'text/markdown' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${topic || 'статья'}.md`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      
+
+      // Если это ручное сохранение в диалоге (не автосохранение)
+      if (!isAutoSave && targetFolderId === undefined && !fileName) {
+        const blob = new Blob([content], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${name}.md`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        return;
+      }
+      
+      // Во всех остальных случаях отправляем запрос на сервер
+      // Создаем копию для отправки на сервер с обязательными полями
+      const articleToSave: KnowledgeItem = {
+        id: isAutoSave ? articleTempId : '',
+        itemType: 'file',
+        fileType: 'article',
+        name: name,
+        content: content,
+        parentId: isAutoSave ? null : targetFolderId || null,
+        children: [],
+        
+        // Можно добавить метаданные для отладки
+        metadata: {
+          autoSaved: isAutoSave,
+          timestamp: new Date().toISOString(),
+          contentLength: content?.length || 0
+        }
+      };
+
+      // Отладочная проверка на пустые значения
+      if (!articleToSave.content) {
+        articleToSave.content = '<p>Автосохранение статьи</p>';
+      }
+      
+      if (!articleToSave.name) {
+        articleToSave.name = 'Автосохраненная статья';
+      }
+
+      
+      const savedArticle = await knowledgeApi.save(articleToSave);
+      
+      // Проверяем ответ сервера
+      if (!savedArticle || !savedArticle.id) {
+        showError('Сервер вернул некорректный ответ. Статья могла не сохраниться.');
+        return;
+      }
+      
+      // При автосохранении обновляем временный ID на постоянный из ответа сервера
+      if (isAutoSave && savedArticle && savedArticle.id) {
+        
+        // Сохраняем текущее состояние редактора перед обновлением ID
+        const currentContent = articleContent;
+        
+        // Обновляем ID
+        setArticleTempId(savedArticle.id);
+        
+        // Сохраняем название из ответа сервера
+        if (savedArticle.name) {
+          setArticleName(savedArticle.name);
+          if (!topic) setTopic(savedArticle.name);
+        }
+        
+        // Важно! Сохраняем содержимое статьи
+        if (isEditing) {
+          setEditableContent(currentContent);
+        } else {
+          setGeneratedArticle(currentContent);
+        }
+        
+        // Уведомляем пользователя об успешном автосохранении
+        console.log('Статья автоматически сохранена');
+      }
+      
+      if (!isAutoSave) {
+        setShowSaveDialog(false);
+        
+        // Обновляем название статьи в случае ручного сохранения
+        if (savedArticle.name) {
+          setArticleName(savedArticle.name);
+          if (!topic) setTopic(savedArticle.name);
+        }
+      }
+    } catch (error) {
+      showError('Ошибка при сохранении статьи');
     }
   };
 
@@ -276,12 +373,16 @@ function RegularArticle() {
               </button>
             </div>
             <MarkdownEditor
-              content={isEditing ? editableContent : generatedArticle}
+              content={articleContent}
               isEditing={isEditing}
               onEdit={toggleEditMode}
               onSave={handleSave}
-              onChange={setEditableContent}
-              title={topic}
+              onChange={(newContent) => {
+                setEditableContent(newContent);
+              }}
+              title={articleName || topic}
+              autoSave={true}
+              itemId={articleTempId}
             />
           </>
         );
@@ -399,7 +500,7 @@ function RegularArticle() {
         onClose={() => setShowSaveDialog(false)}
         onSave={(targetFolderId, fileName) => handleSave(targetFolderId, fileName)}
         items={items}
-        defaultFileName={topic || 'Новая статья'}
+        defaultFileName={articleName || topic || 'Новая статья'}
         contentType="статью"
         title="Сохранить статью"
       />

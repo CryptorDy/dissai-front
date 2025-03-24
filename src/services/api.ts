@@ -122,16 +122,20 @@ function mapCamelCaseToKnowledgeItemDto(item: any): KnowledgeItemDto {
 
 // Вспомогательная функция для преобразования KnowledgeItem в формат API
 function mapKnowledgeItemToApi(item: KnowledgeItem): any {
-  return {
-    id: item.id,
-    itemType: item.itemType,
-    fileType: item.itemType === 'file' ? (item.fileType || null) : null,
-    name: item.name,
-    content: item.content || null,
+  
+  // Убедимся, что все поля сохраняются и не теряются
+  const result = {
+    id: item.id || '',
+    itemType: item.itemType || 'file',
+    fileType: item.itemType === 'file' ? (item.fileType || 'article') : null,
+    name: item.name || 'Без названия',
+    content: item.content || '',
     parentId: item.parentId,
     children: item.children ? item.children.map(child => mapKnowledgeItemToApi(child)) : [],
     metadata: item.metadata
   };
+  
+  return result;
 }
 
 // Вспомогательная функция для преобразования API элемента в KnowledgeItem
@@ -219,45 +223,64 @@ export const knowledgeApi = {
   // Создание или обновление элемента
   save: (data: KnowledgeItem) => {
     console.log('knowledgeApi.save: Начало запроса с данными:', JSON.stringify(data));
+    
+    // Проверим, что получили корректные данные
+    if (!data) {
+      return Promise.reject(new Error('Пустой объект для сохранения'));
+    }
+    
+    if (!data.name) {
+      data.name = 'Без названия';
+    }
+    
+    if (data.itemType === 'file' && !data.fileType) {
+      data.fileType = 'article';
+    }
+    
+    // Преобразуем данные для сервера
     const serverData = mapKnowledgeItemToApi(data);
     console.log('knowledgeApi.save: Данные для отправки на сервер:', JSON.stringify(serverData));
     
-    return api.post<KnowledgeItemDto | any>('/knowledge/save', serverData)
+    // Дополнительные проверки после маппинга
+    if (!serverData.name || !serverData.itemType) {
+      return Promise.reject(new Error('Критические поля отсутствуют после маппинга'));
+    }
+    
+    // Явно задаем HTTP-заголовки и настройки запроса
+    return api.post<KnowledgeItemDto | any>('/knowledge/save', serverData, {
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      transformRequest: [(data, headers) => {
+        return JSON.stringify(data);
+      }]
+    })
       .then(response => {
-        console.log('knowledgeApi.save: Получен ответ от сервера:', JSON.stringify(response.data));
         
         // Проверяем формат данных ответа
         if (response.data && typeof response.data === 'object') {
           // Проверяем, если данные в CamelCase формате (UpperCase)
           if ('Id' in response.data) {
-            console.log('knowledgeApi.save: Обнаружен CamelCase формат ответа');
             const normalizedData = mapCamelCaseToKnowledgeItemDto(response.data);
             return mapApiItemToKnowledgeItem(normalizedData);
           } 
           // Проверяем наличие id в ответе
           else if (!response.data.id) {
-            console.error('knowledgeApi.save: В ответе сервера отсутствует id!', response.data);
             // Если id отсутствует, но есть другие идентификаторы, пробуем их использовать
             if (response.data.Id) {
-              console.log('knowledgeApi.save: Найден Id в CamelCase формате');
               const responseAny = response.data as any;
               responseAny.id = responseAny.Id;
             } else if (response.data._id) {
-              console.log('knowledgeApi.save: Найден _id формат');
               const responseAny = response.data as any;
               responseAny.id = responseAny._id;
             }
           }
-        } else {
-          console.error('knowledgeApi.save: Неожиданный формат ответа от сервера:', response.data);
         }
         
         const result = mapApiItemToKnowledgeItem(response.data);
-        console.log('knowledgeApi.save: Итоговый результат:', JSON.stringify(result));
         return result;
       })
       .catch(error => {
-        console.error('knowledgeApi.save: Ошибка при выполнении запроса:', error);
         throw error;
       });
   },

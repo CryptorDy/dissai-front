@@ -381,7 +381,7 @@ const editorStyles = `
 
 interface RichTextEditorProps {
   content: string;
-  onSave: () => void;
+  onSave: (targetFolderId?: string | null, fileName?: string) => void;
   onChange: (value: string) => void;
   title?: string;
   withBackground?: boolean;
@@ -389,6 +389,7 @@ interface RichTextEditorProps {
   itemId?: string;
   onEdit?: () => void;
   isEditing?: boolean;
+  autoSave?: boolean;
 }
 
 // Расширяем интерфейс для пользовательских событий
@@ -408,10 +409,13 @@ export function RichTextEditor({
   content,
   onSave,
   onChange,
-  title = 'Редактор',
+  title,
   withBackground = true,
   format = 'html',
-  itemId
+  itemId,
+  onEdit,
+  isEditing = true,
+  autoSave = true
 }: RichTextEditorProps) {
   const [showBlockSelector, setShowBlockSelector] = useState(false);
   const [blockSelectorPosition, setBlockSelectorPosition] = useState({ x: 0, y: 0 });
@@ -419,10 +423,45 @@ export function RichTextEditor({
   const floatingButtonRef = useRef<HTMLButtonElement>(null);
   const editorContentRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
   
   // Состояние для отображения меню блока (4 точек)
   const [showHtmlBlockSelector, setShowHtmlBlockSelector] = useState(false);
   const [htmlBlockSelectorPosition, setHtmlBlockSelectorPosition] = useState({ x: 0, y: 0 });
+
+  // Функция автосохранения с задержкой
+  const debouncedAutoSave = (html: string) => {
+    console.log('debouncedAutoSave вызвана, autoSave =', autoSave, 'itemId =', itemId);
+    
+    // Очищаем предыдущий таймер если он был
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+    
+    // Устанавливаем флаг о несохраненных изменениях
+    setIsDirty(true);
+    
+    // Устанавливаем новый таймер для автосохранения
+    autoSaveTimerRef.current = setTimeout(() => {
+      
+      if (autoSave && isDirty) {
+        // Вызываем сохранение - первым параметром явно передаем null, чтобы идентифицировать автосохранение
+        // Вторым параметром undefined, чтобы не передавать имя файла
+        onSave(null, undefined);
+        setIsDirty(false);
+      }
+    }, 400); // Задержка в 400 мс
+  };
+
+  // Очистка таймера при размонтировании компонента
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, []);
 
   const editor = useEditor({
     extensions: [
@@ -526,7 +565,18 @@ export function RichTextEditor({
     content,
     editable: true,
     onUpdate: ({ editor }) => {
-      onChange(editor.getHTML());
+      const html = editor.getHTML();
+      
+      // Проверяем, что содержимое действительно изменилось
+      if (html !== content) {
+        onChange(html);
+        
+        // Запускаем автосохранение при изменении
+        if (autoSave) {
+          debouncedAutoSave(html);
+        } else {
+        }
+      }
     },
     autofocus: 'end',
   });
@@ -624,6 +674,29 @@ export function RichTextEditor({
     };
   }, [editor]);
 
+  // Сохраняем содержимое при обновлении props
+  useEffect(() => {
+    if (editor) {
+      const currentContent = editor.getHTML();
+      
+      // Если изменился itemId, значит загружен новый файл - принудительно обновляем содержимое
+      if (editor && itemId) {
+        editor.commands.setContent(content || '<p></p>');
+        return;
+      }
+      
+      // Если текущее содержимое редактора отличается от пришедшего в props,
+      // и редактор не пустой, сохраняем текущее содержимое
+      if (currentContent && currentContent !== content && currentContent !== '<p></p>') {
+      } else {
+        // Иначе устанавливаем содержимое из props
+        if (content !== currentContent) {
+          editor.commands.setContent(content || '<p></p>');
+        }
+      }
+    }
+  }, [content, itemId, editor]); // Реагируем на изменение content или itemId
+
   // Фокус на последний пустой параграф при монтировании
   useEffect(() => {
     if (editor) {
@@ -636,7 +709,7 @@ export function RichTextEditor({
         editor.commands.focus('end');
       }
     }
-  }, [content, editor]);
+  }, [editor]); // Только при изменении самого editor
 
   const handleExportPDF = () => {
     if (!editor) return;
@@ -670,7 +743,7 @@ export function RichTextEditor({
     titleElement.style.fontWeight = 'bold';
     titleElement.style.marginBottom = '24px';
     titleElement.style.color = '#000000';
-    titleElement.textContent = title;
+    titleElement.textContent = title || 'Документ';
     
     element.appendChild(titleElement);
     
@@ -678,9 +751,10 @@ export function RichTextEditor({
     contentDiv.innerHTML = editor.getHTML();
     element.appendChild(contentDiv);
 
+    const documentTitle = title || 'document';
     const opt = {
       margin: 10,
-      filename: `${title.toLowerCase().replace(/\s+/g, '-')}.pdf`,
+      filename: `${documentTitle.toLowerCase().replace(/\s+/g, '-')}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 2 },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
