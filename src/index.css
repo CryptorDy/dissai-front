@@ -233,3 +233,40 @@
   border-bottom: 1px solid rgba(55, 65, 81, 0.8);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
+
+/* Глобальные стили для скроллбаров */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #aaa;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #ccc transparent;
+}
+
+/* Темные стили для глобальных скроллбаров */
+.dark ::-webkit-scrollbar-thumb {
+  background: #4b5563;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+.dark * {
+  scrollbar-color: #4b5563 transparent;
+}

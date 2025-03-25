@@ -11,6 +11,7 @@ interface MarkdownEditorProps {
   height?: number;
   itemId?: string;
   autoSave?: boolean;
+  fileType?: string;
 }
 
 export function MarkdownEditor({
@@ -22,7 +23,8 @@ export function MarkdownEditor({
   title,
   height = 500,
   itemId,
-  autoSave
+  autoSave = true,
+  fileType = 'article'
 }: MarkdownEditorProps) {
   return (
     <RichTextEditor
@@ -35,6 +37,7 @@ export function MarkdownEditor({
       itemId={itemId}
       format="html" // Всегда используем HTML формат
       autoSave={autoSave}
+      fileType={fileType}
     />
   );
 }

@@ -123,18 +123,26 @@ function mapCamelCaseToKnowledgeItemDto(item: any): KnowledgeItemDto {
 // Вспомогательная функция для преобразования KnowledgeItem в формат API
 function mapKnowledgeItemToApi(item: KnowledgeItem): any {
   
-  // Убедимся, что все поля сохраняются и не теряются
+  if (!item) {
+    console.error('mapKnowledgeItemToApi: Получен пустой объект!');
+    return null;
+  }
+  
+  console.log('mapKnowledgeItemToApi: Входные данные:', JSON.stringify(item));
+
+  // Преобразуем данные без добавления значений по умолчанию
   const result = {
-    id: item.id || '',
-    itemType: item.itemType || 'file',
-    fileType: item.itemType === 'file' ? (item.fileType || 'article') : null,
-    name: item.name || 'Без названия',
-    content: item.content || '',
+    id: item.id,
+    itemType: item.itemType,
+    fileType: item.itemType === 'file' ? item.fileType : null,
+    name: item.name,
+    content: item.content,
     parentId: item.parentId,
     children: item.children ? item.children.map(child => mapKnowledgeItemToApi(child)) : [],
     metadata: item.metadata
   };
   
+  console.log('mapKnowledgeItemToApi: Результат преобразования:', JSON.stringify(result));
   return result;
 }
 
@@ -229,15 +237,24 @@ export const knowledgeApi = {
       return Promise.reject(new Error('Пустой объект для сохранения'));
     }
     
+    // Проверяем наличие обязательных полей
     if (!data.name) {
-      data.name = 'Без названия';
+      return Promise.reject(new Error('Отсутствует название элемента (name)'));
+    }
+    
+    if (!data.itemType) {
+      return Promise.reject(new Error('Отсутствует тип элемента (itemType)'));
     }
     
     if (data.itemType === 'file' && !data.fileType) {
-      data.fileType = 'article';
+      return Promise.reject(new Error('Отсутствует тип файла (fileType) для элемента типа file'));
     }
     
-    // Преобразуем данные для сервера
+    if (data.itemType === 'file' && (!data.content || data.content.trim() === '')) {
+      return Promise.reject(new Error('Пустое содержимое файла (content)'));
+    }
+    
+    // Преобразуем данные для сервера без добавления значений по умолчанию
     const serverData = mapKnowledgeItemToApi(data);
     console.log('knowledgeApi.save: Данные для отправки на сервер:', JSON.stringify(serverData));
     

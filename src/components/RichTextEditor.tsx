@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useEditor, EditorContent, Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
@@ -30,6 +30,9 @@ import { Decoration, DecorationSet } from 'prosemirror-view';
 import ListItem from '@tiptap/extension-list-item';
 import Dropcursor from '@tiptap/extension-dropcursor';
 import Document from '@tiptap/extension-document';
+import { useAutoSave } from '../hooks/useAutoSave';
+import { autoSaveService } from '../services/autoSaveService';
+import { useIdleDetection } from '../hooks/useIdleDetection';
 
 // Импорт стилей из внешних файлов
 import './editor/styles/editorStyles.css';
@@ -331,6 +334,7 @@ interface RichTextEditorProps {
   onEdit?: () => void;
   isEditing?: boolean;
   autoSave?: boolean;
+  fileType?: string;
 }
 
 // Расширяем интерфейс для пользовательских событий
@@ -368,7 +372,8 @@ export function RichTextEditor({
   itemId,
   onEdit,
   isEditing = true,
-  autoSave = true
+  autoSave = true,
+  fileType = 'article'
 }: RichTextEditorProps) {
   const [showBlockSelector, setShowBlockSelector] = useState(false);
   const [blockSelectorPosition, setBlockSelectorPosition] = useState({ x: 0, y: 0 });
@@ -376,45 +381,64 @@ export function RichTextEditor({
   const floatingButtonRef = useRef<HTMLButtonElement>(null);
   const editorContentRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
-  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [isDirty, setIsDirty] = useState(false);
   
   // Состояние для отображения меню блока (4 точек)
   const [showHtmlBlockSelector, setShowHtmlBlockSelector] = useState(false);
   const [htmlBlockSelectorPosition, setHtmlBlockSelectorPosition] = useState({ x: 0, y: 0 });
+  
+  // Состояние автосохранения и его индикация
+  const [autoSaveState, setAutoSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
-  // Функция автосохранения с задержкой
-  const debouncedAutoSave = (html: string) => {
-    console.log('debouncedAutoSave вызвана, autoSave =', autoSave, 'itemId =', itemId);
-    
-    // Очищаем предыдущий таймер если он был
-    if (autoSaveTimerRef.current) {
-      clearTimeout(autoSaveTimerRef.current);
-    }
-    
-    // Устанавливаем флаг о несохраненных изменениях
-    setIsDirty(true);
-    
-    // Устанавливаем новый таймер для автосохранения
-    autoSaveTimerRef.current = setTimeout(() => {
-      
-      if (autoSave && isDirty) {
-        // Вызываем сохранение - первым параметром явно передаем null, чтобы идентифицировать автосохранение
-        // Вторым параметром undefined, чтобы не передавать имя файла
-        onSave(null, undefined);
-        setIsDirty(false);
-      }
-    }, 400); // Задержка в 400 мс
-  };
-
-  // Очистка таймера при размонтировании компонента
+  // Состояние для текущего контента и флаг изменений
+  const [currentContent, setCurrentContent] = useState(content);
+  const [hasChanges, setHasChanges] = useState(false);
+  const [lastSavedContent, setLastSavedContent] = useState<string>(content);
+  
+  // Инициализация автосохранения
+  const { isSaving, saveError, forceSave, lastSaveResult } = useAutoSave(
+    currentContent,
+    async (contentToSave: string, id?: string) => {
+      // Используем глобальный сервис автосохранения
+      console.log(`Автосохранение ${fileType} с ID ${id || itemId}`);
+      return autoSaveService.saveItem(fileType, contentToSave, id || itemId);
+    },
+    400, // задержка 400 мс
+    false, // отключаем автоматический запуск, будем управлять через idle detection
+    itemId
+  );
+  
+  // Сбрасываем флаг изменений при успешном сохранении
   useEffect(() => {
-    return () => {
-      if (autoSaveTimerRef.current) {
-        clearTimeout(autoSaveTimerRef.current);
+    if (lastSaveResult) {
+      setHasChanges(false);
+      setLastSavedContent(currentContent); // Обновляем последний сохраненный контент
+    }
+  }, [lastSaveResult, currentContent]);
+  
+  // Определяем функцию для сохранения при бездействии
+  const handleIdleSave = useCallback(() => {
+    if (autoSave && itemId && hasChanges && !isSaving) {
+      // Сравниваем текущий контент с последним сохраненным, чтобы избежать избыточных сохранений
+      if (JSON.stringify(currentContent) !== JSON.stringify(lastSavedContent)) {
+        console.log('Автосохранение контента');
+        forceSave().then(() => {
+          setHasChanges(false);
+        }).catch(error => {
+          console.error('Ошибка при автосохранении:', error);
+        });
+      } else {
+        // Если контент не изменился, просто сбрасываем флаг изменений
+        setHasChanges(false);
       }
-    };
-  }, []);
+    }
+  }, [autoSave, itemId, hasChanges, isSaving, forceSave, currentContent, lastSavedContent]);
+  
+  // Инициализация обнаружения бездействия
+  const { isIdle } = useIdleDetection(
+    800, // Увеличиваем задержку до 800мс для предотвращения слишком частых сохранений
+    handleIdleSave, // вызываем сохранение при бездействии
+    ['keydown'] // Отслеживаем ТОЛЬКО нажатия клавиш, НЕ события мыши
+  );
 
   const editor = useEditor({
     extensions: [
@@ -522,18 +546,64 @@ export function RichTextEditor({
       const html = editor.getHTML();
       
       // Проверяем, что содержимое действительно изменилось
-      if (html !== content) {
-        onChange(html);
-        
-        // Запускаем автосохранение при изменении
-        if (autoSave) {
-          debouncedAutoSave(html);
-        } else {
-        }
+      if (html !== currentContent) {
+        console.log('Содержимое изменено:', html.substring(0, 50) + '...');
+        setCurrentContent(html); // Обновляем локальное состояние
+        setHasChanges(true); // Отмечаем, что есть изменения
+        onChange(html); // Уведомляем родительский компонент
       }
     },
     autofocus: 'end',
   });
+
+  // Сохраняем содержимое при обновлении props
+  useEffect(() => {
+    if (editor) {
+      const editorContent = editor.getHTML();
+      
+      // Обновляем содержимое при любом изменении content или itemId, включая очистку content
+      // Обновляем также, если контент стал пустым (при выборе пустого файла)
+      if (editorContent !== content || (content === '' && editorContent !== '<p></p>')) {
+        console.log('Обновление содержимого редактора из-за изменения props content');
+        editor.commands.setContent(content || '<p></p>');
+        // Сбрасываем состояние редактора при смене файла
+        setCurrentContent(content);
+        setLastSavedContent(content);
+        setHasChanges(false);
+      }
+    }
+  }, [content, itemId, editor]);
+
+  // Обновляем локальное состояние, когда извне приходит новый контент
+  useEffect(() => {
+    // Даже если есть изменения, но контент полностью изменился (сменился файл),
+    // всё равно обновляем локальное состояние
+    const contentChanged = content !== currentContent;
+    const isContentReset = !content && currentContent; // Обрабатываем случай, когда content стал пустым
+    
+    if (contentChanged && (isContentReset || !hasChanges)) {
+      setCurrentContent(content);
+      setLastSavedContent(content);
+      setHasChanges(false);
+    }
+  }, [content, currentContent, hasChanges]);
+
+  // Обновляем статус автосохранения
+  useEffect(() => {
+    if (isSaving) {
+      setAutoSaveState('saving');
+    } else if (saveError) {
+      setAutoSaveState('error');
+      console.error('Ошибка автосохранения:', saveError);
+    } else if (autoSaveState === 'saving') {
+      setAutoSaveState('saved');
+      // Сбрасываем статус "saved" через 2 секунды
+      const timer = setTimeout(() => {
+        setAutoSaveState('idle');
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [isSaving, saveError, autoSaveState]);
 
   // Добавляем обработчик события выделения текста и клика на иконку
   useEffect(() => {
@@ -627,29 +697,6 @@ export function RichTextEditor({
       editorEl?.removeEventListener('click', handleCombinedClick);
     };
   }, [editor]);
-
-  // Сохраняем содержимое при обновлении props
-  useEffect(() => {
-    if (editor) {
-      const currentContent = editor.getHTML();
-      
-      // Если изменился itemId, значит загружен новый файл - принудительно обновляем содержимое
-      if (editor && itemId) {
-        editor.commands.setContent(content || '<p></p>');
-        return;
-      }
-      
-      // Если текущее содержимое редактора отличается от пришедшего в props,
-      // и редактор не пустой, сохраняем текущее содержимое
-      if (currentContent && currentContent !== content && currentContent !== '<p></p>') {
-      } else {
-        // Иначе устанавливаем содержимое из props
-        if (content !== currentContent) {
-          editor.commands.setContent(content || '<p></p>');
-        }
-      }
-    }
-  }, [content, itemId, editor]); // Реагируем на изменение content или itemId
 
   // Фокус на последний пустой параграф при монтировании
   useEffect(() => {
@@ -767,6 +814,16 @@ export function RichTextEditor({
       editor.commands.insertStyledHtmlBlock = (html: string) => insertStyledHtmlBlock(editor, html);
     }
   }, [editor]);
+
+  // Перед размонтированием компонента принудительно сохраняем изменения
+  useEffect(() => {
+    return () => {
+      // Если есть несохраненные изменения, сохраняем их
+      if (autoSave && itemId && hasChanges && !isSaving) {
+        forceSave().catch(err => console.error('Ошибка окончательного сохранения:', err));
+      }
+    };
+  }, [autoSave, itemId, hasChanges, isSaving, forceSave]);
 
   return (
     <div className={withBackground ? "bg-white dark:bg-gray-800 rounded-xl p-8" : ""}>

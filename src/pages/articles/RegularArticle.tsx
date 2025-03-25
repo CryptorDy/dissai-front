@@ -97,6 +97,22 @@ function RegularArticle() {
     }
   }, [articleTempId]);
 
+  // Следим за изменениями в контенте и обновляем состояния
+  useEffect(() => {
+    if (articleContent) {
+      // Если мы в режиме редактирования и контент изменился, обновляем editableContent
+      if (isEditing && editableContent !== articleContent) {
+        console.log('Обновление editableContent из articleContent');
+        setEditableContent(articleContent);
+      }
+      // Если мы не в режиме редактирования и контент изменился, обновляем generatedArticle
+      else if (!isEditing && generatedArticle !== articleContent) {
+        console.log('Обновление generatedArticle из articleContent');
+        setGeneratedArticle(articleContent);
+      }
+    }
+  }, [articleContent, isEditing, editableContent, generatedArticle]);
+
   const handleInitialSubmit = async () => {
     setCurrentView('loading');
     try {
@@ -203,125 +219,7 @@ function RegularArticle() {
     }
   };
 
-  const handleSave = async (targetFolderId?: string | null, fileName?: string) => {
-    
-    const content = articleContent;
-    
-    // Если targetFolderId = null и нет fileName, значит это автосохранение
-    const isAutoSave = targetFolderId === null && !fileName;
-    
-    try {
-      console.log('Создаем объект статьи');
-      
-      // Используем либо переданное имя файла, либо существующее имя статьи, либо тему, либо 'Новая статья'
-      const name = fileName || articleName || topic || 'Новая статья';
-      
-      // При автосохранении используем временный ID
-      const newArticle: KnowledgeItem = {
-        id: isAutoSave ? articleTempId : `temp-file-${Date.now()}`,
-        itemType: 'file',
-        fileType: 'article',
-        name: name,
-        content: content,
-        parentId: isAutoSave ? null : targetFolderId || null,
-      };
-      
-      // Обновляем название статьи в состоянии 
-      if (fileName && fileName !== articleName) {
-        setArticleName(fileName);
-      }
-      
-
-      // Если это ручное сохранение в диалоге (не автосохранение)
-      if (!isAutoSave && targetFolderId === undefined && !fileName) {
-        const blob = new Blob([content], { type: 'text/markdown' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${name}.md`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        return;
-      }
-      
-      // Во всех остальных случаях отправляем запрос на сервер
-      // Создаем копию для отправки на сервер с обязательными полями
-      const articleToSave: KnowledgeItem = {
-        id: isAutoSave ? articleTempId : '',
-        itemType: 'file',
-        fileType: 'article',
-        name: name,
-        content: content,
-        parentId: isAutoSave ? null : targetFolderId || null,
-        children: [],
-        
-        // Можно добавить метаданные для отладки
-        metadata: {
-          autoSaved: isAutoSave,
-          timestamp: new Date().toISOString(),
-          contentLength: content?.length || 0
-        }
-      };
-
-      // Отладочная проверка на пустые значения
-      if (!articleToSave.content) {
-        articleToSave.content = '<p>Автосохранение статьи</p>';
-      }
-      
-      if (!articleToSave.name) {
-        articleToSave.name = 'Автосохраненная статья';
-      }
-
-      
-      const savedArticle = await knowledgeApi.save(articleToSave);
-      
-      // Проверяем ответ сервера
-      if (!savedArticle || !savedArticle.id) {
-        showError('Сервер вернул некорректный ответ. Статья могла не сохраниться.');
-        return;
-      }
-      
-      // При автосохранении обновляем временный ID на постоянный из ответа сервера
-      if (isAutoSave && savedArticle && savedArticle.id) {
-        
-        // Сохраняем текущее состояние редактора перед обновлением ID
-        const currentContent = articleContent;
-        
-        // Обновляем ID
-        setArticleTempId(savedArticle.id);
-        
-        // Сохраняем название из ответа сервера
-        if (savedArticle.name) {
-          setArticleName(savedArticle.name);
-          if (!topic) setTopic(savedArticle.name);
-        }
-        
-        // Важно! Сохраняем содержимое статьи
-        if (isEditing) {
-          setEditableContent(currentContent);
-        } else {
-          setGeneratedArticle(currentContent);
-        }
-        
-        // Уведомляем пользователя об успешном автосохранении
-        console.log('Статья автоматически сохранена');
-      }
-      
-      if (!isAutoSave) {
-        setShowSaveDialog(false);
-        
-        // Обновляем название статьи в случае ручного сохранения
-        if (savedArticle.name) {
-          setArticleName(savedArticle.name);
-          if (!topic) setTopic(savedArticle.name);
-        }
-      }
-    } catch (error) {
-      showError('Ошибка при сохранении статьи');
-    }
-  };
+  
 
   const toggleEditMode = () => {
     if (!isEditing) {
