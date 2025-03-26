@@ -783,42 +783,42 @@ function Knowledge() {
       });
       
       const isFileWithTempId = item.itemType !== 'folder' && item.id.startsWith('temp-');
-
+     
       // ОПТИМИСТИЧНОЕ ОБНОВЛЕНИЕ UI - немедленно изменяем имя в UI независимо от типа элемента
-      const tempId = item.id;
-      
+        const tempId = item.id;
+        
       // Обновляем имя в локальном состоянии немедленно
-      setItems(prev => {
+        setItems(prev => {
         const updateItemName = (items: KnowledgeItem[]): KnowledgeItem[] => {
-          return items.map(i => {
-            if (i.id === tempId) {
-              return {
-                ...i,
-                name: newName
-              };
-            }
-            if (i.children && i.children.length > 0) {
-              return {
-                ...i,
+            return items.map(i => {
+              if (i.id === tempId) {
+                return {
+                  ...i,
+                  name: newName
+                };
+              }
+              if (i.children && i.children.length > 0) {
+                return {
+                  ...i,
                 children: updateItemName(i.children)
-              };
-            }
-            return i;
-          });
-        };
+                };
+              }
+              return i;
+            });
+          };
         return updateItemName(prev);
-      });
-      
-      // Обновляем имя выбранного элемента, если это тот же самый
-      if (selectedItem?.id === tempId) {
-        setSelectedItem(prev => ({
-          ...prev!,
-          name: newName
-        }));
-      }
-      
+        });
+        
+        // Обновляем имя выбранного элемента, если это тот же самый
+        if (selectedItem?.id === tempId) {
+          setSelectedItem(prev => ({
+            ...prev!,
+            name: newName
+          }));
+        }
+        
       // Выходим из режима редактирования сразу
-      setIsEditing(null);
+        setIsEditing(null);
      
       // Кейс: Новый файл с временным ID - отправляем полное содержимое
       if (isFileWithTempId) {
@@ -933,64 +933,64 @@ function Knowledge() {
 
       // Если это не файл с временным ID, значит это существующий элемент или другой тип временного элемента
       if (!isFileWithTempId) {
-        console.log("Обновление существующего элемента или другого типа временного элемента:", item.id);
-        
-        // Обновляем существующий элемент
-        const updatedItem = {
-          ...itemToEdit,
-          name: newName.trim()
-        };
-        
-        // Полная копия для отладки
-        console.log("Отправляем на сервер:", JSON.stringify(updatedItem));
-        
+          console.log("Обновление существующего элемента или другого типа временного элемента:", item.id);
+          
+          // Обновляем существующий элемент
+          const updatedItem = {
+            ...itemToEdit,
+            name: newName.trim()
+          };
+          
+          // Полная копия для отладки
+          console.log("Отправляем на сервер:", JSON.stringify(updatedItem));
+          
         // Для обычного элемента - отправляем запрос асинхронно
-        if (!item.id.startsWith('temp-')) {
-          console.log("Обновляем существующий элемент:", item.id);
+          if (!item.id.startsWith('temp-')) {
+            console.log("Обновляем существующий элемент:", item.id);
           // Асинхронно отправляем запрос, не блокируя UI
           knowledgeApi.updateItem(item.id, updatedItem)
             .catch(error => {
               console.error("Ошибка при обновлении элемента:", error);
               showError('Ошибка при обновлении имени элемента');
-              
+            
               // В случае ошибки можно вернуть прежнее имя
-              setItems(prev => {
+            setItems(prev => {
                 const revertItemName = (items: KnowledgeItem[]): KnowledgeItem[] => {
-                  return items.map(i => {
-                    if (i.id === tempId) {
-                      return {
-                        ...i,
+                return items.map(i => {
+                  if (i.id === tempId) {
+                    return {
+                      ...i,
                         name: item.name
-                      };
-                    }
-                    if (i.children && i.children.length > 0) {
-                      return {
-                        ...i,
+                    };
+                  }
+                  if (i.children && i.children.length > 0) {
+                    return {
+                      ...i,
                         children: revertItemName(i.children)
-                      };
-                    }
-                    return i;
-                  });
-                };
+                    };
+                  }
+                  return i;
+                });
+              };
                 return revertItemName(prev);
-              });
-              
-              // Обновляем имя выбранного элемента, если это тот же самый
-              if (selectedItem?.id === tempId) {
-                setSelectedItem(prev => ({
-                  ...prev!,
+            });
+            
+            // Обновляем имя выбранного элемента, если это тот же самый
+            if (selectedItem?.id === tempId) {
+              setSelectedItem(prev => ({
+                ...prev!,
                   name: item.name
-                }));
-              }
+              }));
+            }
             });
         }
         // ... остальной код для временных элементов
-      }
-    } catch (error) {
+          }
+        } catch (error) {
       console.error('Ошибка при сохранении:', error);
       showError('Ошибка при сохранении изменений');
     } finally {
-      setIsEditing(null);
+    setIsEditing(null);
     }
   };
 

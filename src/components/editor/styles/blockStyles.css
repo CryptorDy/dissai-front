@@ -7,6 +7,52 @@
   font-style: italic;
 }
 
+/* Специальные стили для сохранения структуры HTML блоков */
+.ProseMirror div[data-type="html-block"] {
+  display: block;
+  position: relative;
+  box-sizing: border-box;
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}
+
+.ProseMirror div[data-type="html-block"] + div[data-type="html-block"] {
+  margin-top: 1.5rem;
+}
+
+/* Добавляем визуальное обозначение для блоков в режиме редактирования */
+.ProseMirror div[data-type="html-block"]:hover::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  right: -4px;
+  bottom: -4px;
+  border: 1px dashed rgba(59, 130, 246, 0.5);
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.ProseMirror div[data-type="html-block"]::after {
+  content: '';
+  height: 1px;
+  display: block;
+  clear: both;
+}
+
+/* Стили для HTML-контейнеров */
+.ProseMirror blockquote.html-container {
+  font-style: normal;
+  border-left: none;
+  padding-left: 0;
+}
+
+.ProseMirror blockquote.html-container > div {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}
+
 .ProseMirror ul, .ProseMirror ol {
   padding-left: 1em;
   margin-bottom: 1em;
@@ -713,4 +759,549 @@
   .ProseMirror .md\:grid-cols-3 {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+}
+
+/* Стили для NodeView блоков */
+.tiptap-nodeview-block {
+  position: relative;
+  margin: 1em 0;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+  cursor: text;
+  box-sizing: border-box;
+  border-radius: 4px;
+  border: 1px solid transparent;
+}
+
+/* Содержимое редактируемого блока */
+.tiptap-nodeview-content {
+  padding: 8px 12px;
+  min-height: 24px;
+}
+
+/* Стили для различных типов блоков */
+.tiptap-nodeview-block[class*="callout"],
+.tiptap-nodeview-block[class*="info"],
+.tiptap-nodeview-block[class*="warning"],
+.tiptap-nodeview-block[class*="note"],
+.tiptap-nodeview-block[class*="tip"] {
+  padding: 0; /* Убираем внешний padding */
+}
+
+/* Стили при наведении */
+.tiptap-nodeview-block:hover {
+  background-color: rgba(35, 131, 226, 0.07);
+  border-color: rgba(35, 131, 226, 0.3);
+}
+
+/* Стили для выделенного блока */
+.tiptap-nodeview-selected,
+.ProseMirror-selectednode.tiptap-nodeview-block {
+  background-color: rgba(35, 131, 226, 0.12) !important;
+  border-color: rgba(35, 131, 226, 0.5) !important;
+}
+
+/* Удаляем обводку при выделении */
+.ProseMirror-selectednode.tiptap-nodeview-block {
+  outline: none !important;
+}
+
+/* Кнопка удаления блока */
+.tiptap-nodeview-delete {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background-color: #f1f1f1;
+  color: #666;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+  opacity: 0;
+  transition: opacity 0.2s ease, background-color 0.2s ease;
+  z-index: 20;
+}
+
+.tiptap-nodeview-block:hover .tiptap-nodeview-delete {
+  opacity: 1;
+}
+
+.tiptap-nodeview-delete:hover {
+  background-color: #e74c3c;
+  color: white;
+}
+
+/* Добавляем меню действий при наведении - внутри блока */
+.tiptap-nodeview-block::after {
+  content: '⊕';
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  width: 20px;
+  height: 20px;
+  background-color: #f1f1f1;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: #777;
+  opacity: 0;
+  transition: opacity 0.2s ease, background-color 0.2s ease;
+  cursor: move;
+  z-index: 10;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+}
+
+.tiptap-nodeview-block:hover::after {
+  opacity: 1;
+}
+
+.tiptap-nodeview-block:hover::after:hover {
+  background-color: #e0e0e0;
+}
+
+/* Удаляем старое меню, которое было вне блока */
+.tiptap-nodeview-block::before {
+  content: none;
+}
+
+/* Стили для вставляемых блоков типа callout */
+.callout-block, 
+.advice-block,
+.warning-block,
+.info-block {
+  position: relative;
+  border-radius: 3px;
+  margin: 1em 0;
+}
+
+/* Стили для пошаговой инструкции в стиле Notion */
+.steps-block {
+  position: relative;
+  background-color: transparent;
+  border-radius: 4px;
+  margin: 1.5em 0;
+}
+
+.steps-list {
+  position: relative;
+  margin-left: 0;
+  padding-left: 0;
+}
+
+.steps-list::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 15px;
+  width: 2px;
+  background-color: rgba(55, 53, 47, 0.16);
+  z-index: 1;
+}
+
+.dark .steps-list::before {
+  background-color: rgba(255, 255, 255, 0.13);
+}
+
+.step-item {
+  position: relative;
+  z-index: 2;
+  margin-bottom: 8px;
+  list-style: none;
+}
+
+.step-number {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 500;
+  color: rgb(55, 53, 47);
+  background-color: rgba(55, 53, 47, 0.08);
+}
+
+.dark .step-number {
+  color: rgba(255, 255, 255, 0.87);
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.step-content h4 {
+  margin-top: 0;
+  margin-bottom: 4px;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+/* Стили для блока заметок */
+.note-block {
+  background-color: rgba(235, 236, 237, 0.3);
+  border-left: 5px solid #d3d3d3;
+  padding: 16px;
+  border-radius: 3px;
+}
+
+.dark .note-block {
+  background-color: rgba(47, 48, 50, 0.3);
+  border-left-color: #555;
+}
+
+/* Стили для блока списка задач */
+.task-list-block {
+  position: relative;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.task-list-block:focus-within {
+  border-color: rgba(59, 130, 246, 0.5);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+/* Стилизация элементов задачи */
+.task-item {
+  position: relative;
+  margin-bottom: 8px;
+}
+
+.task-item:last-child {
+  margin-bottom: 0;
+}
+
+.task-item label {
+  padding: 6px 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+  align-items: flex-start;
+}
+
+.task-item label:hover {
+  background-color: rgba(0, 0, 0, 0.03);
+}
+
+.dark .task-item label:hover {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+/* Стилизация чекбоксов с использованием модификатора peer */
+.task-checkbox-icon {
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+input.task-checkbox:checked + label .task-checkbox-icon svg {
+  opacity: 1;
+  transform: scale(1);
+}
+
+input.task-checkbox + label .task-checkbox-icon svg {
+  transform: scale(0.8);
+  transition: all 0.2s ease;
+}
+
+/* Анимация при наведении на чекбокс */
+.task-checkbox-icon:hover {
+  border-color: rgba(59, 130, 246, 0.5);
+  background-color: rgba(59, 130, 246, 0.05);
+}
+
+/* Стилизация при активном состоянии */
+.task-item input:active + label .task-checkbox-icon {
+  transform: scale(0.9);
+}
+
+/* Анимация перечеркивания текста */
+input.task-checkbox:checked + label span:not(.task-checkbox-icon):not([class*="bg-"]) {
+  text-decoration: line-through;
+  color: #9ca3af;
+  transition: all 0.3s ease;
+}
+
+/* Стилизация меток задач */
+.task-item label span[class*="bg-"] {
+  transition: all 0.2s ease;
+}
+
+/* Стили для задач с приоритетом */
+.task-item label span.bg-red-100 {
+  font-weight: 500;
+}
+
+/* Специальная стилизация для плавной анимации */
+@keyframes checkmark {
+  0% {
+    stroke-dashoffset: 24;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Добавление подсказки перед добавлением задачи */
+.task-list-block .task-item:last-child::after {
+  content: '';
+  position: absolute;
+  bottom: -12px;
+  left: 32px;
+  width: 0;
+  height: 1px;
+  background-color: #e5e7eb;
+  transition: all 0.2s ease;
+}
+
+.dark .task-list-block .task-item:last-child::after {
+  background-color: #374151;
+}
+
+.task-list-block:hover .task-item:last-child::after {
+  width: calc(100% - 32px);
+}
+
+/* Дополнительные стили для расширенного списка задач */
+.task-list-advanced {
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.task-list-advanced:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.dark .task-list-advanced:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Стили для меток приоритета */
+.task-list-advanced .rounded-full {
+  transition: all 0.2s ease;
+}
+
+/* Анимация прогресс-бара */
+.task-list-advanced .bg-blue-500 {
+  transition: width 0.5s ease;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* Стили для заголовка проекта */
+.task-list-advanced h3 {
+  position: relative;
+  display: inline-block;
+}
+
+.task-list-advanced h3::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background-color: #3b82f6;
+  transition: width 0.3s ease;
+}
+
+.dark .task-list-advanced h3::after {
+  background-color: #60a5fa;
+}
+
+.task-list-advanced:hover h3::after {
+  width: 100%;
+}
+
+/* Улучшенный дизайн для чекбоксов в расширенном списке */
+.task-list-advanced .task-checkbox-icon {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* Улучшенная анимация для чекбоксов */
+.task-list-advanced input.task-checkbox:checked + label .task-checkbox-icon {
+  animation: checkbox-pop 0.3s ease-in-out;
+}
+
+@keyframes checkbox-pop {
+  0% {
+    transform: scale(0.8);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Стили для затухания текста при отмеченных задачах */
+.task-list-advanced input.task-checkbox:checked + label .flex-1 {
+  opacity: 0.75;
+  transition: opacity 0.3s ease;
+}
+
+/* Стили для Канбан-доски */
+.kanban-board {
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.kanban-board:hover {
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+}
+
+.dark .kanban-board:hover {
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+/* Стили для колонок */
+.kanban-column {
+  min-height: 120px;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.kanban-column:hover {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.dark .kanban-column:hover {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+/* Стили для заголовков колонок */
+.kanban-column-header {
+  position: relative;
+}
+
+.kanban-column-header h4 {
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.kanban-column:hover .kanban-column-header h4 {
+  transform: translateX(2px);
+}
+
+/* Стили для карточек в канбане */
+.kanban-card {
+  position: relative;
+  transition: all 0.2s ease;
+  transform-origin: center;
+  backface-visibility: hidden;
+}
+
+.kanban-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
+  z-index: 10;
+}
+
+.dark .kanban-card:hover {
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Имитация перетаскивания при длительном наведении */
+.kanban-card:active {
+  cursor: grabbing;
+  transform: scale(0.97) translateY(0);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  opacity: 0.9;
+}
+
+/* Специальные стили для активной карточки */
+.kanban-column:nth-child(2) .kanban-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.kanban-column:nth-child(2) .kanban-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background-color: #f59e0b;
+  transition: all 0.3s ease;
+}
+
+.kanban-column:nth-child(2) .kanban-card:hover::before {
+  background-color: #d97706;
+}
+
+/* Анимация счетчиков в заголовках колонок */
+.kanban-column-header span.rounded-full {
+  transition: all 0.3s ease;
+}
+
+.kanban-column:hover .kanban-column-header span.rounded-full {
+  background-color: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+}
+
+.dark .kanban-column:hover .kanban-column-header span.rounded-full {
+  background-color: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+}
+
+/* Стилизация меток в карточках */
+.kanban-card span[class*="rounded"] {
+  transition: all 0.2s ease;
+}
+
+.kanban-card:hover span[class*="rounded"] {
+  filter: brightness(1.05);
+}
+
+/* Анимация для прогресс-бара */
+.kanban-board .bg-green-500 {
+  transition: width 0.5s ease;
+}
+
+/* Эффект "потенциального перетаскивания" */
+@media (min-width: 768px) {
+  .kanban-column:first-child .kanban-card:hover::after,
+  .kanban-column:nth-child(2) .kanban-card:hover::after {
+    content: '';
+    position: absolute;
+    width: 15px; 
+    height: 15px;
+    right: -5px;
+    top: 50%;
+    transform: translateY(-50%) rotate(45deg);
+    border-top: 2px dashed rgba(59, 130, 246, 0.3);
+    border-right: 2px dashed rgba(59, 130, 246, 0.3);
+    opacity: 0;
+    animation: blinkArrow 2s infinite;
+    pointer-events: none;
+  }
+}
+
+@keyframes blinkArrow {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
+}
+
+/* Стили для аватаров пользователей */
+.kanban-card .rounded-full {
+  transition: all 0.2s ease;
+}
+
+.kanban-card:hover .rounded-full {
+  transform: scale(1.08);
 } 

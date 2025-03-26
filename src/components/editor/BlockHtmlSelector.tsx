@@ -28,7 +28,11 @@ import {
   Images,
   Palette,
   Highlighter,
-  XCircle
+  XCircle,
+  Check,
+  BookOpen,
+  Link2,
+  Grid2x2
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
@@ -39,31 +43,118 @@ interface BlockSelectorProps {
   position: { x: number; y: number };
 }
 
-type BlockCategory = 'Все' | 'Основные' | 'Медиа' | 'Макеты' | 'Выноски' | 'Продвинутые' | 'Стилизованные';
+type BlockCategory = 'Все' | 'Основные' | 'Медиа' | 'Макеты' | 'Выноски' | 'Продвинутые' | 'Стилизованные' | 'Notion';
 
 type Block = {
   id: string;
   title: string;
   description: string;
   icon: React.ReactNode;
-  category: BlockCategory[];
+  categories: BlockCategory[];
   action?: (editor: any) => void;
   html?: string;
 };
 
 const insertHtml = (editor: any, html: string) => {
-  // Проверяем, есть ли метод insertStyledHtmlBlock в редакторе
-  if (editor && editor.commands && editor.commands.insertStyledHtmlBlock) {
-    // Используем метод insertStyledHtmlBlock для сохранения CSS-классов
-    editor.commands.insertStyledHtmlBlock(html);
-  } else if (editor) {
-    // Запасной вариант, если метод не доступен
-    editor.commands.insertContent(html);
+  // Упрощаем HTML, удаляя лишние переносы строк для лучшей обработки
+  try {
+    const cleanHtml = html
+      .replace(/\n\s+/g, ' ')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+
+    // Создаем временный div для анализа HTML
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = cleanHtml;
+    
+    // Проверяем, нужно ли оборачивать HTML в div data-type="html-block"
+    let htmlToInsert = cleanHtml;
+    const rootElement = tempDiv.firstElementChild;
+    if (rootElement && !rootElement.hasAttribute('data-type')) {
+      htmlToInsert = `<div data-type="html-block">${cleanHtml}</div>`;
+    }
+    
+    // Основной подход: вставка HTML напрямую в DOM, минуя парсинг TipTap
+    
+    // 1. Создаем пустой HTMLBlockNode
+    const emptyHtmlNode = {
+      type: 'htmlBlock',
+      attrs: {
+        'data-type': 'html-block'
+      },
+      content: []
+    };
+    
+    // 2. Вставляем пустой узел
+    editor.commands.insertContent(emptyHtmlNode);
+    
+    // 3. Находим созданный узел в DOM и заменяем его содержимое напрямую
+    setTimeout(() => {
+      // Получаем текущую позицию и узлы
+      const view = editor.view;
+      const state = view.state;
+      const selection = state.selection;
+      
+      // Находим недавно вставленный узел с атрибутом data-type="html-block"
+      const htmlBlocks = document.querySelectorAll('[data-type="html-block"]');
+      if (htmlBlocks.length > 0) {
+        // Берем последний вставленный блок
+        const latestBlock = htmlBlocks[htmlBlocks.length - 1];
+        
+        // Очищаем содержимое узла
+        while (latestBlock.firstChild) {
+          latestBlock.removeChild(latestBlock.firstChild);
+        }
+        
+        // Вставляем HTML напрямую, минуя парсер TipTap
+        latestBlock.innerHTML = htmlToInsert;
+        
+        // Добавляем класс для визуального отображения
+        latestBlock.classList.add('tiptap-nodeview-block');
+        
+        // Добавляем кнопку удаления
+        const deleteButton = document.createElement('button');
+        deleteButton.classList.add('tiptap-nodeview-delete');
+        deleteButton.innerHTML = '✕';
+        deleteButton.title = 'Удалить блок';
+        latestBlock.appendChild(deleteButton);
+        
+        // Добавляем обработчик удаления
+        deleteButton.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          
+          // Находим узел в структуре TipTap и удаляем его
+          const pos = editor.view.posAtDOM(latestBlock, 0);
+          if (pos !== null) {
+            const textLength = latestBlock.textContent ? latestBlock.textContent.length : 0;
+            editor.commands.deleteRange({ from: pos, to: pos + textLength + 2 });
+          }
+        });
+      }
+      
+      // Фокусируемся на редакторе
+      editor.commands.focus();
+    }, 10);
+    
+    return;
+  } catch (globalError) {
+    console.error('Критическая ошибка при вставке:', globalError);
+    // В крайнем случае просто вставляем обычный текст
+    try {
+      editor.commands.insertText('Блок контента');
+    } catch (e) {
+      // Молча игнорируем ошибку, если уже ничего не помогает
+    }
   }
   
   // Фокусируемся на редакторе после вставки
-  if (editor) {
+  try {
+    if (editor && editor.commands && editor.commands.focus) {
     editor.commands.focus();
+    }
+  } catch (e) {
+    // Игнорируем ошибку фокуса
   }
 };
 
@@ -75,22 +166,13 @@ export function BlockSelector({ editor, isOpen, onClose, position }: BlockSelect
   
   // Определяем блоки
   const blocks: Block[] = [
-    {
-      id: 'text',
-      title: 'Текст',
-      description: 'Обычный текстовый блок',
-      icon: <FileText className="w-4 h-4" />,
-      category: ['Все', 'Основные'],
-      action: (editor) => {
-        editor.chain().focus().setParagraph().run();
-      }
-    },
+    
     {
       id: 'heading1',
       title: 'Заголовок 1',
       description: 'Большой заголовок',
       icon: <span className="text-sm font-bold">H1</span>,
-      category: ['Все', 'Основные'],
+      categories: ['Все', 'Основные'],
       action: (editor) => {
         editor.chain().focus().toggleHeading({ level: 1 }).run();
       }
@@ -100,7 +182,7 @@ export function BlockSelector({ editor, isOpen, onClose, position }: BlockSelect
       title: 'Заголовок 2',
       description: 'Средний заголовок',
       icon: <span className="text-sm font-bold">H2</span>,
-      category: ['Все', 'Основные'],
+      categories: ['Все', 'Основные'],
       action: (editor) => {
         editor.chain().focus().toggleHeading({ level: 2 }).run();
       }
@@ -110,7 +192,7 @@ export function BlockSelector({ editor, isOpen, onClose, position }: BlockSelect
       title: 'Заголовок 3',
       description: 'Маленький заголовок',
       icon: <span className="text-sm font-bold">H3</span>,
-      category: ['Все', 'Основные'],
+      categories: ['Все', 'Основные'],
       action: (editor) => {
         editor.chain().focus().toggleHeading({ level: 3 }).run();
       }
@@ -120,7 +202,7 @@ export function BlockSelector({ editor, isOpen, onClose, position }: BlockSelect
       title: 'Маркированный список',
       description: 'Список с маркерами',
       icon: <List className="w-4 h-4" />,
-      category: ['Все', 'Основные'],
+      categories: ['Все', 'Основные'],
       action: (editor) => {
         editor.chain().focus().toggleBulletList().run();
       }
@@ -130,7 +212,7 @@ export function BlockSelector({ editor, isOpen, onClose, position }: BlockSelect
       title: 'Нумерованный список',
       description: 'Список с нумерацией',
       icon: <ListOrdered className="w-4 h-4" />,
-      category: ['Все', 'Основные'],
+      categories: ['Все', 'Основные'],
       action: (editor) => {
         editor.chain().focus().toggleOrderedList().run();
       }
@@ -140,7 +222,7 @@ export function BlockSelector({ editor, isOpen, onClose, position }: BlockSelect
       title: 'Список задач',
       description: 'Список с чекбоксами',
       icon: <CheckSquare className="w-4 h-4" />,
-      category: ['Все', 'Основные'],
+      categories: ['Все', 'Основные'],
       action: (editor) => {
         editor.chain().focus().toggleTaskList().run();
       }
@@ -150,105 +232,17 @@ export function BlockSelector({ editor, isOpen, onClose, position }: BlockSelect
       title: 'Блок кода',
       description: 'Блок для форматированного кода',
       icon: <Code className="w-4 h-4" />,
-      category: ['Все', 'Продвинутые'],
+      categories: ['Все', 'Продвинутые'],
       action: (editor) => {
         editor.chain().focus().toggleCodeBlock().run();
       }
-    },
-    {
-      id: 'highlight',
-      title: 'Выделенный текст',
-      description: 'Выделенный цветом текст',
-      icon: <Highlighter className="w-4 h-4 text-yellow-500" />,
-      category: ['Все', 'Основные'],
-      html: `<p>Обычный текст <mark class="bg-yellow-200 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 px-1 rounded">выделенный текст</mark> продолжение параграфа.</p>`
-    },
-    {
-      id: 'warning',
-      title: 'Предупреждение',
-      description: 'Блок предупреждения',
-      icon: <AlertTriangle className="w-4 h-4 text-amber-500" />,
-      category: ['Все', 'Выноски'],
-      html: `<div class="p-4 bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-500 text-amber-700 dark:text-amber-300 my-4">
-        <div class="flex">
-          <div class="flex-shrink-0">
-            <svg class="h-5 w-5 text-amber-500" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
-            </svg>
-          </div>
-          <div class="ml-3">
-            <p class="text-sm font-medium">Внимание</p>
-            <p class="text-sm mt-1">Здесь текст предупреждения.</p>
-          </div>
-        </div>
-      </div>`
-    },
-    {
-      id: 'info',
-      title: 'Информация',
-      description: 'Информационный блок',
-      icon: <Info className="w-4 h-4 text-blue-500" />,
-      category: ['Все', 'Выноски'],
-      html: `<div class="p-4 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 text-blue-700 dark:text-blue-300 my-4">
-        <div class="flex">
-          <div class="flex-shrink-0">
-            <svg class="h-5 w-5 text-blue-500" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
-            </svg>
-          </div>
-          <div class="ml-3">
-            <p class="text-sm font-medium">Информация</p>
-            <p class="text-sm mt-1">Здесь информационный текст.</p>
-          </div>
-        </div>
-      </div>`
-    },
-    {
-      id: 'success',
-      title: 'Успех',
-      description: 'Блок успешного действия',
-      icon: <CheckCircle className="w-4 h-4 text-green-500" />,
-      category: ['Все', 'Выноски'],
-      html: `<div class="p-4 bg-emerald-50 dark:bg-green-900/20 border-l-4 border-green-500 text-green-700 dark:text-green-300 my-4">
-        <div class="flex">
-          <div class="flex-shrink-0">
-            <svg class="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-            </svg>
-          </div>
-          <div class="ml-3">
-            <p class="text-sm font-medium">Успешно</p>
-            <p class="text-sm mt-1">Действие успешно выполнено.</p>
-          </div>
-        </div>
-      </div>`
-    },
-    {
-      id: 'error',
-      title: 'Ошибка',
-      description: 'Блок с сообщением об ошибке',
-      icon: <XCircle className="w-4 h-4 text-rose-500" />,
-      category: ['Все', 'Выноски'],
-      html: `<div class="p-4 bg-rose-50 dark:bg-rose-900/20 border-l-4 border-rose-500 text-rose-700 dark:text-rose-300 my-4">
-        <div class="flex">
-          <div class="flex-shrink-0">
-            <svg class="h-5 w-5 text-rose-500" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
-            </svg>
-          </div>
-          <div class="ml-3">
-            <p class="text-sm font-medium">Ошибка</p>
-            <p class="text-sm mt-1">Произошла ошибка при выполнении действия.</p>
-          </div>
-        </div>
-      </div>`
     },
     {
       id: 'divider',
       title: 'Разделитель',
       description: 'Горизонтальная линия',
       icon: <span className="w-4 h-0.5 bg-gray-400 rounded-full"></span>,
-      category: ['Все', 'Основные'],
+      categories: ['Все', 'Основные'],
       action: (editor) => {
         editor.chain().focus().setHorizontalRule().run();
         onClose();
@@ -257,371 +251,340 @@ export function BlockSelector({ editor, isOpen, onClose, position }: BlockSelect
     {
       id: 'callout',
       title: 'Выноска',
-      description: 'Стилизованный блок с акцентом',
-      icon: <Bookmark className="w-4 h-4 text-indigo-500" />,
-      category: ['Все', 'Стилизованные', 'Выноски'],
-      action: (editor) => {
-        editor.chain().focus().insertContent(`<div class="p-4 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-md text-indigo-700 dark:text-indigo-300 my-4">
-          <div class="flex">
-            <div class="flex-shrink-0">
-              <svg class="h-5 w-5 text-indigo-500" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
-              </svg>
-            </div>
-            <div class="ml-3">
-              <p class="text-sm font-medium">Важная информация</p>
-              <p class="text-sm mt-1">Здесь размещается важная информация, на которую стоит обратить внимание.</p>
-            </div>
+      description: 'Блок с цветной рамкой и иконкой',
+      icon: <BookOpen className="w-4 h-4 text-blue-500" />,
+      categories: ['Все', 'Notion'],
+      html: `<div class="callout-block p-4 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 rounded-r-md" data-type="html-block">
+        <div class="flex">
+          <div class="flex-shrink-0 text-blue-500 mr-3">
+            <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+            </svg>
           </div>
-        </div>`).run();
-        onClose();
-      }
-    },
-    {
-      id: 'twoColumns',
-      title: 'Две колонки',
-      description: 'Разделенный на две колонки блок',
-      icon: <Layout className="w-4 h-4 text-gray-600" />,
-      category: ['Все', 'Макеты', 'Продвинутые'],
-      action: (editor) => {
-        editor.chain().focus().insertContent(`<div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-4">
-          <div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-md">
-            <p>Содержимое первой колонки. Здесь можно разместить текст или другие элементы.</p>
+          <div>
+            <p class="text-gray-800 dark:text-gray-200">Это блок выноски в стиле Notion. Здесь можно размещать важную информацию, которую вы хотите выделить.</p>
           </div>
-          <div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-md">
-            <p>Содержимое второй колонки. Здесь можно разместить текст или другие элементы.</p>
-          </div>
-        </div>`).run();
-        onClose();
-      }
-    },
-    {
-      id: 'card',
-      title: 'Карточка',
-      description: 'Блок с тенью и рамкой',
-      icon: <Square className="w-4 h-4 text-gray-500" />,
-      category: ['Все', 'Стилизованные', 'Макеты'],
-      html: `<div class="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 my-4">
-        <h3 class="text-base font-medium text-gray-900 dark:text-white mb-2">Заголовок карточки</h3>
-        <p class="text-gray-600 dark:text-gray-300">Содержимое карточки. Этот блок можно использовать для выделения важной информации или группировки связанного контента.</p>
+        </div>
       </div>`
     },
     {
-      id: 'progressList',
-      title: 'Чеклист с прогрессом',
-      description: 'Список задач с индикатором',
-      icon: <FileCheck className="w-4 h-4 text-emerald-500" />,
-      category: ['Все', 'Продвинутые', 'Стилизованные'],
-      html: `<div class="my-4">
-        <div class="flex justify-between items-center mb-2">
-          <h3 class="text-sm font-medium text-gray-900 dark:text-white">Прогресс выполнения</h3>
-          <span class="text-sm text-gray-500 dark:text-gray-400">2/5</span>
+      id: 'toggle',
+      title: 'Сворачиваемый блок',
+      description: 'Блок, который можно свернуть',
+      icon: <ChevronDown className="w-4 h-4 text-gray-500" />,
+      categories: ['Все', 'Notion'],
+      html: `<div class="toggle-block my-2" data-type="html-block">
+        <div class="toggle-header cursor-pointer p-2 bg-gray-50 dark:bg-gray-800 flex items-center text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700 rounded-md" onclick="
+          const content = this.nextElementSibling;
+          const arrow = this.querySelector('.toggle-arrow');
+          if (content.style.display === 'none' || !content.style.display) {
+            content.style.display = 'block';
+            arrow.style.transform = 'rotate(90deg)';
+          } else {
+            content.style.display = 'none';
+            arrow.style.transform = 'rotate(0deg)';
+          }
+        ">
+          <span class="toggle-arrow mr-2 inline-block transition-transform" style="transform: rotate(0deg);">▶</span>
+          <span class="font-medium">Сворачиваемый блок (нажмите, чтобы развернуть)</span>
+          </div>
+        <div class="toggle-content pl-6 pt-2 pb-1 border border-t-0 border-gray-200 dark:border-gray-700 rounded-b-md" style="display: none;">
+          <p class="text-gray-700 dark:text-gray-300">Здесь размещается контент, который можно скрыть или показать. Это удобно для длинных пояснений или дополнительной информации.</p>
         </div>
-        <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-4">
-          <div class="bg-emerald-500 h-2 rounded-full" style="width: 40%;"></div>
-        </div>
-        <ul class="space-y-2">
-          <li class="flex items-center">
-            <div class="flex items-center h-5">
-              <input id="task-1" type="checkbox" checked="checked" class="w-4 h-4 text-emerald-500 border-gray-300 rounded focus:ring-emerald-500" />
-            </div>
-            <label for="task-1" class="ml-2 text-sm font-medium text-gray-500 line-through dark:text-gray-400">Задача 1</label>
-          </li>
-          <li class="flex items-center">
-            <div class="flex items-center h-5">
-              <input id="task-2" type="checkbox" checked="checked" class="w-4 h-4 text-emerald-500 border-gray-300 rounded focus:ring-emerald-500" />
-            </div>
-            <label for="task-2" class="ml-2 text-sm font-medium text-gray-500 line-through dark:text-gray-400">Задача 2</label>
-          </li>
-          <li class="flex items-center">
-            <div class="flex items-center h-5">
-              <input id="task-3" type="checkbox" class="w-4 h-4 text-emerald-500 border-gray-300 rounded focus:ring-emerald-500" />
-            </div>
-            <label for="task-3" class="ml-2 text-sm font-medium text-gray-900 dark:text-white">Задача 3</label>
-          </li>
-          <li class="flex items-center">
-            <div class="flex items-center h-5">
-              <input id="task-4" type="checkbox" class="w-4 h-4 text-emerald-500 border-gray-300 rounded focus:ring-emerald-500" />
-            </div>
-            <label for="task-4" class="ml-2 text-sm font-medium text-gray-900 dark:text-white">Задача 4</label>
-          </li>
-          <li class="flex items-center">
-            <div class="flex items-center h-5">
-              <input id="task-5" type="checkbox" class="w-4 h-4 text-emerald-500 border-gray-300 rounded focus:ring-emerald-500" />
-            </div>
-            <label for="task-5" class="ml-2 text-sm font-medium text-gray-900 dark:text-white">Задача 5</label>
-          </li>
-        </ul>
       </div>`
     },
     {
-      id: 'timeline',
-      title: 'Таймлайн',
-      description: 'Временная шкала с этапами',
-      icon: <Clock className="w-4 h-4 text-cyan-500" />,
-      category: ['Все', 'Продвинутые', 'Стилизованные'],
-      action: (editor) => {
-        editor.chain().focus().insertContent(`<div class="my-4 border-l-2 border-gray-200 dark:border-gray-700 space-y-6">
-          <div class="relative pl-6">
-            <span class="absolute -left-1.5 mt-1.5 h-3 w-3 rounded-full bg-cyan-500"></span>
-            <h3 class="text-sm font-medium text-gray-900 dark:text-white">Этап 1</h3>
-            <time class="text-xs text-gray-500 dark:text-gray-400 mb-1">Январь 2023</time>
-            <p class="text-sm text-gray-600 dark:text-gray-300">Описание первого этапа. Здесь можно разместить информацию о событии или задаче.</p>
-          </div>
-          <div class="relative pl-6">
-            <span class="absolute -left-1.5 mt-1.5 h-3 w-3 rounded-full bg-cyan-500"></span>
-            <h3 class="text-sm font-medium text-gray-900 dark:text-white">Этап 2</h3>
-            <time class="text-xs text-gray-500 dark:text-gray-400 mb-1">Февраль 2023</time>
-            <p class="text-sm text-gray-600 dark:text-gray-300">Описание второго этапа. Здесь можно разместить информацию о событии или задаче.</p>
-          </div>
-          <div class="relative pl-6">
-            <span class="absolute -left-1.5 mt-1.5 h-3 w-3 rounded-full bg-cyan-500"></span>
-            <h3 class="text-sm font-medium text-gray-900 dark:text-white">Этап 3</h3>
-            <time class="text-xs text-gray-500 dark:text-gray-400 mb-1">Март 2023</time>
-            <p class="text-sm text-gray-600 dark:text-gray-300">Описание третьего этапа. Здесь можно разместить информацию о событии или задаче.</p>
-          </div>
-        </div>`).run();
-        onClose();
-      }
+      id: 'noteBlock',
+      title: 'Заметка',
+      description: 'Простая заметка',
+      icon: <PenTool className="w-4 h-4 text-gray-500" />,
+      categories: ['Все', 'Notion'],
+      html: `<div class="note-block" data-type="html-block">
+        <p>Это простая заметка. Используйте её для коротких сообщений или напоминаний.</p>
+      </div>`
     },
     {
       id: 'tipBlock',
       title: 'Подсказка',
       description: 'Блок с полезным советом',
       icon: <Lightbulb className="w-4 h-4 text-yellow-500" />,
-      category: ['Все', 'Выноски', 'Стилизованные'],
-      action: (editor) => {
-        editor.chain().focus().insertContent(`<div class="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-md border border-yellow-200 dark:border-yellow-800 my-4">
-          <div class="flex items-start">
-            <div class="flex-shrink-0 mt-0.5">
-              <svg class="h-5 w-5 text-yellow-500" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd" />
+      categories: ['Все', 'Notion'],
+      html: `<div class="tip-block p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded-r-lg" data-type="html-block">
+          <div class="flex">
+          <div class="flex-shrink-0 text-yellow-500 mr-3">
+            <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z" />
               </svg>
             </div>
-            <div class="ml-3">
-              <h4 class="text-sm font-medium text-yellow-800 dark:text-yellow-300">Совет</h4>
-              <p class="text-sm text-yellow-700 dark:text-yellow-200 mt-1">Здесь можно разместить полезный совет или рекомендацию для читателя.</p>
+          <div>
+            <p class="text-yellow-700 font-medium">Совет</p>
+            <p class="text-yellow-600">Полезная рекомендация, которая поможет улучшить результат или сделать работу быстрее.</p>
             </div>
           </div>
-        </div>`).run();
-        onClose();
-      }
+      </div>`
     },
     {
-      id: 'quoteWithAuthor',
-      title: 'Цитата с автором',
-      description: 'Оформленная цитата с источником',
-      icon: <MessageSquare className="w-4 h-4 text-purple-500" />,
-      category: ['Все', 'Выноски', 'Стилизованные'],
-      action: (editor) => {
-        editor.chain().focus().insertContent(`<div class="my-4 pl-4 border-l-4 border-purple-500 bg-purple-50 dark:bg-purple-900/20 dark:border-purple-800 p-4 rounded-r-md">
-          <p class="text-base italic font-medium leading-relaxed text-gray-700 dark:text-gray-300">«Единственный способ сделать что-то очень хорошо – это очень любить то, что ты делаешь.»</p>
-          <div class="mt-2 text-sm text-gray-500 dark:text-gray-400">— Стив Джобс</div>
-        </div>`).run();
-        onClose();
-      }
-    },
-    {
-      id: 'noteBlock',
-      title: 'Заметка',
-      description: 'Блок для личных заметок',
-      icon: <PenTool className="w-4 h-4 text-rose-500" />,
-      category: ['Все', 'Стилизованные'],
-      html: `<div class="p-4 my-4 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-md">
-        <div class="flex items-center mb-2">
-          <svg class="h-5 w-5 text-rose-500 mr-2" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-          </svg>
-          <h4 class="text-sm font-medium text-rose-700 dark:text-rose-300">Моя заметка</h4>
-        </div>
-        <p class="text-sm text-rose-600 dark:text-rose-200">Здесь можно добавить заметку для себя или для команды. Этот блок хорошо выделяется в общем тексте.</p>
+      id: 'simpleTable',
+      title: 'Таблица',
+      description: 'Таблица с данными',
+      icon: <Table className="w-4 h-4 text-gray-600" />,
+      categories: ['Все', 'Notion'],
+      html: `<div class="table-wrapper my-4" data-type="html-block">
+        <table class="w-full border-collapse">
+          <tr>
+            <th class="border border-gray-300 dark:border-gray-600 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-left">Заголовок 1</th>
+            <th class="border border-gray-300 dark:border-gray-600 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-left">Заголовок 2</th>
+          </tr>
+          <tr>
+            <td class="border border-gray-300 dark:border-gray-600 px-4 py-2">Ячейка 1</td>
+            <td class="border border-gray-300 dark:border-gray-600 px-4 py-2">Ячейка 2</td>
+          </tr>
+          <tr>
+            <td class="border border-gray-300 dark:border-gray-600 px-4 py-2">Ячейка 3</td>
+            <td class="border border-gray-300 dark:border-gray-600 px-4 py-2">Ячейка 4</td>
+          </tr>
+        </table>
       </div>`
     },
     {
       id: 'stepsBlock',
-      title: 'Шаги процесса',
+      title: 'Пошаговая инструкция',
       description: 'Пронумерованные шаги с инструкциями',
       icon: <ArrowRight className="w-4 h-4 text-blue-500" />,
-      category: ['Все', 'Продвинутые', 'Стилизованные'],
-      html: `<div class="my-4 space-y-4">
-        <h3 class="text-base font-medium text-gray-900 dark:text-white">Пошаговая инструкция</h3>
-        <ol class="space-y-4">
-          <li class="flex items-start">
-            <div class="flex-shrink-0 flex items-center justify-center h-6 w-6 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 font-medium text-sm mr-3 mt-0.5">1</div>
-            <div>
-              <h4 class="text-sm font-medium text-gray-900 dark:text-white">Первый шаг</h4>
-              <p class="text-sm text-gray-600 dark:text-gray-300 mt-1">Описание первого шага. Что именно нужно сделать и как это сделать правильно.</p>
+      categories: ['Все', 'Notion'],
+      html: `<div class="steps-block" data-type="html-block">
+        <h3 class="text-base font-medium text-gray-900 dark:text-white mb-4">Пошаговая инструкция</h3>
+        <ol class="steps-list space-y-6 pl-0 list-none">
+          <li class="step-item">
+            <div class="flex items-start">
+              <div class="step-number flex-shrink-0 flex items-center justify-center h-8 w-8 rounded-full mr-3 mt-0.5">1</div>
+              <div class="step-content">
+                <h4>Первый шаг</h4>
+                <p class="text-gray-600 dark:text-gray-300 mt-1">Описание первого шага. Что именно нужно сделать и как это сделать правильно.</p>
+        </div>
+        </div>
+          </li>
+          <li class="step-item">
+            <div class="flex items-start">
+              <div class="step-number flex-shrink-0 flex items-center justify-center h-8 w-8 rounded-full mr-3 mt-0.5">2</div>
+              <div class="step-content">
+                <h4>Второй шаг</h4>
+                <p class="text-gray-600 dark:text-gray-300 mt-1">Описание второго шага. Что нужно сделать после выполнения первого шага.</p>
+            </div>
             </div>
           </li>
-          <li class="flex items-start">
-            <div class="flex-shrink-0 flex items-center justify-center h-6 w-6 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 font-medium text-sm mr-3 mt-0.5">2</div>
-            <div>
-              <h4 class="text-sm font-medium text-gray-900 dark:text-white">Второй шаг</h4>
-              <p class="text-sm text-gray-600 dark:text-gray-300 mt-1">Описание второго шага. Что нужно сделать после выполнения первого шага.</p>
+          <li class="step-item">
+            <div class="flex items-start">
+              <div class="step-number flex-shrink-0 flex items-center justify-center h-8 w-8 rounded-full mr-3 mt-0.5">3</div>
+              <div class="step-content">
+                <h4>Третий шаг</h4>
+                <p class="text-gray-600 dark:text-gray-300 mt-1">Описание третьего шага. Завершающие действия и результат.</p>
             </div>
-          </li>
-          <li class="flex items-start">
-            <div class="flex-shrink-0 flex items-center justify-center h-6 w-6 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 font-medium text-sm mr-3 mt-0.5">3</div>
-            <div>
-              <h4 class="text-sm font-medium text-gray-900 dark:text-white">Третий шаг</h4>
-              <p class="text-sm text-gray-600 dark:text-gray-300 mt-1">Описание третьего шага. Завершающие действия и результат.</p>
             </div>
           </li>
         </ol>
       </div>`
     },
     {
-      id: 'textHighlight',
-      title: 'Выделенный текст',
-      description: 'Текст с цветным фоном',
-      icon: <AlignLeft className="w-4 h-4 text-teal-500" />,
-      category: ['Все', 'Основные', 'Стилизованные'],
+      id: 'quoteWithAuthor',
+      title: 'Цитата с автором',
+      description: 'Оформленная цитата с источником',
+      icon: <MessageSquare className="w-4 h-4 text-purple-500" />,
+      categories: ['Все', 'Notion'],
+      html: `<div class="quote-block p-4 pl-6 border-l-4 border-gray-400 bg-gray-50 dark:bg-gray-800/50 dark:border-gray-600 my-4" data-type="html-block">
+          <p class="text-base italic font-medium leading-relaxed text-gray-700 dark:text-gray-300">«Единственный способ сделать что-то очень хорошо – это очень любить то, что ты делаешь.»</p>
+          <div class="mt-2 text-sm text-gray-500 dark:text-gray-400">— Стив Джобс</div>
+      </div>`
+    },
+    {
+      id: 'cssTaskList',
+      title: 'Список задач CSS',
+      description: 'Интерактивный список задач без JavaScript',
+      icon: <CheckSquare className="w-4 h-4 text-green-500" />,
+      categories: ['Все', 'Notion'],
+      html: `<div class="task-list-block p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" data-type="html-block">
+        <h3 class="text-base font-medium text-gray-900 dark:text-white mb-4">Список задач</h3>
+        <div class="space-y-3">
+          <div class="task-item">
+            <input type="checkbox" id="task1" class="task-checkbox peer hidden" />
+            <label for="task1" class="flex items-center cursor-pointer">
+              <span class="task-checkbox-icon flex-shrink-0 w-5 h-5 border border-gray-300 dark:border-gray-600 rounded mr-3 flex items-center justify-center peer-checked:bg-blue-500 peer-checked:border-blue-500 dark:peer-checked:bg-blue-600 dark:peer-checked:border-blue-600 transition-colors">
+                <svg class="w-3 h-3 text-white opacity-0 peer-checked:opacity-100" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" />
+          </svg>
+              </span>
+              <span class="text-gray-700 dark:text-gray-300 peer-checked:text-gray-500 dark:peer-checked:text-gray-400 peer-checked:line-through transition-colors">Первая задача</span>
+            </label>
+        </div>
+          
+          <div class="task-item">
+            <input type="checkbox" id="task2" class="task-checkbox peer hidden" checked />
+            <label for="task2" class="flex items-center cursor-pointer">
+              <span class="task-checkbox-icon flex-shrink-0 w-5 h-5 border border-gray-300 dark:border-gray-600 rounded mr-3 flex items-center justify-center peer-checked:bg-blue-500 peer-checked:border-blue-500 dark:peer-checked:bg-blue-600 dark:peer-checked:border-blue-600 transition-colors">
+                <svg class="w-3 h-3 text-white opacity-0 peer-checked:opacity-100" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" />
+                </svg>
+              </span>
+              <span class="text-gray-700 dark:text-gray-300 peer-checked:text-gray-500 dark:peer-checked:text-gray-400 peer-checked:line-through transition-colors">Выполненная задача</span>
+            </label>
+            </div>
+          
+          <div class="task-item">
+            <input type="checkbox" id="task3" class="task-checkbox peer hidden" />
+            <label for="task3" class="flex items-center cursor-pointer">
+              <span class="task-checkbox-icon flex-shrink-0 w-5 h-5 border border-gray-300 dark:border-gray-600 rounded mr-3 flex items-center justify-center peer-checked:bg-blue-500 peer-checked:border-blue-500 dark:peer-checked:bg-blue-600 dark:peer-checked:border-blue-600 transition-colors">
+                <svg class="w-3 h-3 text-white opacity-0 peer-checked:opacity-100" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" />
+                </svg>
+              </span>
+              <span class="text-gray-700 dark:text-gray-300 peer-checked:text-gray-500 dark:peer-checked:text-gray-400 peer-checked:line-through transition-colors">Третья задача с длинным описанием, чтобы проверить перенос строк при большом количестве текста</span>
+            </label>
+            </div>
+          
+          <div class="task-item">
+            <input type="checkbox" id="task4" class="task-checkbox peer hidden" />
+            <label for="task4" class="flex items-center cursor-pointer">
+              <span class="task-checkbox-icon flex-shrink-0 w-5 h-5 border border-gray-300 dark:border-gray-600 rounded mr-3 flex items-center justify-center peer-checked:bg-blue-500 peer-checked:border-blue-500 dark:peer-checked:bg-blue-600 dark:peer-checked:border-blue-600 transition-colors">
+                <svg class="w-3 h-3 text-white opacity-0 peer-checked:opacity-100" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" />
+                </svg>
+              </span>
+              <span class="text-gray-700 dark:text-gray-300 peer-checked:text-gray-500 dark:peer-checked:text-gray-400 peer-checked:line-through transition-colors">Срочная задача</span>
+              <span class="ml-2 px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-xs rounded">Срочно</span>
+            </label>
+            </div>
+          
+          <div class="task-item">
+            <input type="checkbox" id="task5" class="task-checkbox peer hidden" />
+            <label for="task5" class="flex items-center cursor-pointer">
+              <span class="task-checkbox-icon flex-shrink-0 w-5 h-5 border border-gray-300 dark:border-gray-600 rounded mr-3 flex items-center justify-center peer-checked:bg-blue-500 peer-checked:border-blue-500 dark:peer-checked:bg-blue-600 dark:peer-checked:border-blue-600 transition-colors">
+                <svg class="w-3 h-3 text-white opacity-0 peer-checked:opacity-100" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" />
+                </svg>
+              </span>
+              <span class="text-gray-700 dark:text-gray-300 peer-checked:text-gray-500 dark:peer-checked:text-gray-400 peer-checked:line-through transition-colors">Добавить новую задачу в список</span>
+            </label>
+          </div>
+        </div>
+        
+        <div class="mt-4 border-t border-gray-200 dark:border-gray-700 pt-4">
+          <div class="flex items-center text-gray-500 dark:text-gray-400 text-sm">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <span>Нажмите на чекбокс, чтобы отметить задачу как выполненную</span>
+          </div>
+        </div>
+      </div>`
+    },
+    {
+      id: 'cssTaskListAdvanced',
+      title: 'Список задач с приоритетами',
+      description: 'Расширенный список задач с метками',
+      icon: <CheckSquare className="w-4 h-4 text-blue-500" />,
+      categories: ['Все', 'Notion'],
+      html: `<div class="task-list-advanced p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 shadow-sm" data-type="html-block">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-base font-medium text-gray-900 dark:text-white">Проект: Запуск сайта</h3>
+          <span class="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs rounded-full">В процессе</span>
+        </div>
+        
+        <div class="space-y-3">
+          <div class="task-item">
+            <input type="checkbox" id="advtask1" class="task-checkbox peer hidden" />
+            <label for="advtask1" class="flex items-start cursor-pointer">
+              <span class="task-checkbox-icon flex-shrink-0 w-5 h-5 border border-gray-300 dark:border-gray-600 rounded mr-3 mt-0.5 flex items-center justify-center peer-checked:bg-blue-500 peer-checked:border-blue-500 dark:peer-checked:bg-blue-600 dark:peer-checked:border-blue-600 transition-colors">
+                <svg class="w-3 h-3 text-white opacity-0 peer-checked:opacity-100" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" />
+        </svg>
+              </span>
+              <div class="flex-1">
+                <div class="flex flex-wrap items-center">
+                  <span class="text-gray-700 dark:text-gray-300 peer-checked:text-gray-500 dark:peer-checked:text-gray-400 peer-checked:line-through transition-colors">Подготовить графические материалы</span>
+                  <span class="ml-2 px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-xs rounded-full">Высокий</span>
+                </div>
+                <div class="mt-1 text-xs text-gray-500 dark:text-gray-400 flex items-center">
+                  <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+              </svg>
+                  <span>Дедлайн: 25 марта</span>
+            </div>
+          </div>
+            </label>
+          </div>
+          
+          <div class="task-item">
+            <input type="checkbox" id="advtask2" class="task-checkbox peer hidden" checked />
+            <label for="advtask2" class="flex items-start cursor-pointer">
+              <span class="task-checkbox-icon flex-shrink-0 w-5 h-5 border border-gray-300 dark:border-gray-600 rounded mr-3 mt-0.5 flex items-center justify-center peer-checked:bg-blue-500 peer-checked:border-blue-500 dark:peer-checked:bg-blue-600 dark:peer-checked:border-blue-600 transition-colors">
+                <svg class="w-3 h-3 text-white opacity-0 peer-checked:opacity-100" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" />
+                </svg>
+              </span>
+              <div class="flex-1">
+                <div class="flex flex-wrap items-center">
+                  <span class="text-gray-700 dark:text-gray-300 peer-checked:text-gray-500 dark:peer-checked:text-gray-400 peer-checked:line-through transition-colors">Создать структуру сайта</span>
+                  <span class="ml-2 px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 text-xs rounded-full">Завершено</span>
+        </div>
+                <div class="mt-1 text-xs text-gray-500 dark:text-gray-400 flex items-center">
+                  <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+                  <span>Завершено 20 марта</span>
+            </div>
+          </div>
+            </label>
+          </div>
+          
+          <div class="task-item">
+            <input type="checkbox" id="advtask3" class="task-checkbox peer hidden" />
+            <label for="advtask3" class="flex items-start cursor-pointer">
+              <span class="task-checkbox-icon flex-shrink-0 w-5 h-5 border border-gray-300 dark:border-gray-600 rounded mr-3 mt-0.5 flex items-center justify-center peer-checked:bg-blue-500 peer-checked:border-blue-500 dark:peer-checked:bg-blue-600 dark:peer-checked:border-blue-600 transition-colors">
+                <svg class="w-3 h-3 text-white opacity-0 peer-checked:opacity-100" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" />
+                </svg>
+              </span>
+              <div class="flex-1">
+                <div class="flex flex-wrap items-center">
+                  <span class="text-gray-700 dark:text-gray-300 peer-checked:text-gray-500 dark:peer-checked:text-gray-400 peer-checked:line-through transition-colors">Настроить аналитику и SEO</span>
+                  <span class="ml-2 px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400 text-xs rounded-full">Средний</span>
+                </div>
+                <div class="mt-1 text-xs text-gray-500 dark:text-gray-400 flex items-center">
+                  <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                  </svg>
+                  <span>Дедлайн: 30 марта</span>
+                </div>
+              </div>
+            </label>
+          </div>
+        </div>
+        
+        <div class="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
+          <div class="text-xs text-gray-500 dark:text-gray-400">
+            <span class="font-medium">Прогресс:</span> 1/3 задач выполнено
+          </div>
+          <div class="w-24 bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+            <div class="bg-blue-500 h-full rounded-full" style="width: 33%"></div>
+          </div>
+        </div>
+      </div>`
+    },
+    {
+      id: 'kanban-board',
+      title: 'Канбан-доска',
+      description: 'Доска задач с возможностью перетаскивания',
+      icon: <Grid2x2 className="w-4 h-4 text-blue-500" />,
+      categories: ['Все', 'Продвинутые', 'Макеты'],
       action: (editor) => {
-        editor.chain().focus().insertContent('<span class="bg-teal-100 dark:bg-teal-900/40 text-teal-800 dark:text-teal-200 px-1 py-0.5 rounded">выделенный текст</span>').run();
+        editor.chain().focus().insertContent({
+          type: 'interactiveKanban',
+          attrs: {
+            boardState: null
+          }
+        }).run();
         onClose();
       }
-    },
-    {
-      id: 'button',
-      title: 'Кнопка',
-      description: 'Стилизованная кнопка с ссылкой',
-      icon: <MousePointer className="w-4 h-4 text-blue-500" />,
-      category: ['Все', 'Стилизованные', 'Продвинутые'],
-      html: `<a href="#" class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md shadow-sm transition-colors my-2">
-        <span>Нажмите здесь</span>
-        <svg class="ml-2 -mr-1 w-4 h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-          <path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"></path>
-        </svg>
-      </a>`
-    },
-    {
-      id: 'accordion',
-      title: 'Аккордеон',
-      description: 'Раскрывающийся блок информации',
-      icon: <ChevronDown className="w-4 h-4 text-gray-600" />,
-      category: ['Все', 'Продвинутые', 'Макеты'],
-      html: `<div class="my-4 border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden">
-        <div class="border-b border-gray-200 dark:border-gray-700 last:border-b-0">
-          <div class="flex justify-between items-center font-medium cursor-pointer p-4">
-            <div>Раскрывающийся блок</div>
-            <div class="text-gray-500">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="6 9 12 15 18 9"></polyline>
-              </svg>
-            </div>
-          </div>
-          <div class="p-4 border-t border-gray-200 dark:border-gray-700">
-            <p class="text-sm text-gray-600 dark:text-gray-400">Этот блок изначально скрыт и раскрывается при клике на заголовок. Здесь можно разместить дополнительную информацию, которая не должна занимать место на странице постоянно.</p>
-          </div>
-        </div>
-        <div class="border-b border-gray-200 dark:border-gray-700 last:border-b-0">
-          <div class="flex justify-between items-center font-medium cursor-pointer p-4">
-            <div>Еще один блок</div>
-            <div class="text-gray-500">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="6 9 12 15 18 9"></polyline>
-              </svg>
-            </div>
-          </div>
-          <div class="p-4 border-t border-gray-200 dark:border-gray-700">
-            <p class="text-sm text-gray-600 dark:text-gray-400">Контент второго раскрывающегося блока. Аккордеоны хороши для FAQ или структурированной информации с заголовками.</p>
-          </div>
-        </div>
-      </div>`
-    },
-    {
-      id: 'statCard',
-      title: 'Статистическая карточка',
-      description: 'Блок с числовыми данными',
-      icon: <BarChart className="w-4 h-4 text-violet-500" />,
-      category: ['Все', 'Стилизованные', 'Продвинутые'],
-      html: `<div class="grid grid-cols-1 md:grid-cols-3 gap-4 my-4">
-        <div class="p-4 bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
-          <div class="flex items-center">
-            <div class="flex-shrink-0 mr-3">
-              <div class="p-2 bg-violet-100 dark:bg-violet-900/20 rounded-full">
-                <svg width="24" height="24" viewBox="0 0 24 24" class="text-violet-500" fill="currentColor">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1h-6v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" />
-                </svg>
-              </div>
-            </div>
-            <div>
-              <p class="text-sm text-gray-500 dark:text-gray-400 font-medium">Посещения</p>
-              <p class="text-2xl font-bold text-gray-900 dark:text-white">12,540</p>
-              <p class="text-sm text-green-500">+12.5% с прошлого месяца</p>
-            </div>
-          </div>
-        </div>
-        
-        <div class="p-4 bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
-          <div class="flex items-center">
-            <div class="flex-shrink-0 mr-3">
-              <div class="p-2 bg-emerald-100 dark:bg-emerald-900/20 rounded-full">
-                <svg width="24" height="24" viewBox="0 0 24 24" class="text-emerald-500" fill="currentColor">
-                  <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
-                </svg>
-              </div>
-            </div>
-            <div>
-              <p class="text-sm text-gray-500 dark:text-gray-400 font-medium">Просмотры</p>
-              <p class="text-2xl font-bold text-gray-900 dark:text-white">34,680</p>
-              <p class="text-sm text-green-500">+8.3% с прошлого месяца</p>
-            </div>
-          </div>
-        </div>
-        
-        <div class="p-4 bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
-          <div class="flex items-center">
-            <div class="flex-shrink-0 mr-3">
-              <div class="p-2 bg-amber-100 dark:bg-amber-900/20 rounded-full">
-                <svg width="24" height="24" viewBox="0 0 24 24" class="text-amber-500" fill="currentColor">
-                  <path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6h-6z" />
-                </svg>
-              </div>
-            </div>
-            <div>
-              <p class="text-sm text-gray-500 dark:text-gray-400 font-medium">Конверсия</p>
-              <p class="text-2xl font-bold text-gray-900 dark:text-white">6.4%</p>
-              <p class="text-sm text-red-500">-2.1% с прошлого месяца</p>
-            </div>
-          </div>
-        </div>
-      </div>`
-    },
-    {
-      id: 'gallery',
-      title: 'Галерея',
-      description: 'Сетка изображений в ряд',
-      icon: <Images className="w-4 h-4 text-pink-500" />,
-      category: ['Все', 'Медиа', 'Стилизованные'],
-      html: `<div class="my-4">
-        <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
-          <div class="relative aspect-[4/3] rounded-md overflow-hidden">
-            <img src="https://images.unsplash.com/photo-1499951360447-b19be8fe80f5" alt="Пример изображения" class="w-full h-full object-cover" />
-          </div>
-          <div class="relative aspect-[4/3] rounded-md overflow-hidden">
-            <img src="https://images.unsplash.com/photo-1550745165-9bc0b252726f" alt="Пример изображения" class="w-full h-full object-cover" />
-          </div>
-          <div class="relative aspect-[4/3] rounded-md overflow-hidden">
-            <img src="https://images.unsplash.com/photo-1498050108023-c5249f4df085" alt="Пример изображения" class="w-full h-full object-cover" />
-          </div>
-        </div>
-        <p class="text-xs text-gray-500 text-center mt-2">Примеры изображений. Замените их на ваши собственные.</p>
-      </div>`
-    },
-    {
-      id: 'gradientCard',
-      title: 'Градиентная карточка',
-      description: 'Карточка с градиентным фоном',
-      icon: <Palette className="w-4 h-4 text-indigo-500" />,
-      category: ['Все', 'Стилизованные', 'Макеты'],
-      html: `<div class="p-6 my-4 rounded-lg relative overflow-hidden text-white" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-        <div class="relative z-10">
-          <h3 class="text-xl font-bold mb-2">Яркий заголовок</h3>
-          <p class="text-white/90">Этот блок с градиентным фоном привлекает внимание и может использоваться для важных объявлений или акцентов в тексте.</p>
-          <a href="#" class="inline-block mt-4 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-md backdrop-blur-sm text-sm font-medium transition-colors">Подробнее</a>
-        </div>
-      </div>`
     }
   ];
 
@@ -646,7 +609,7 @@ export function BlockSelector({ editor, isOpen, onClose, position }: BlockSelect
   const filteredBlocks = blocks.filter(block => {
     const matchesSearch = block.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           block.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = activeCategory === 'Все' || block.category.includes(activeCategory);
+    const matchesCategory = activeCategory === 'Все' || block.categories.includes(activeCategory);
     return matchesSearch && matchesCategory;
   });
 
@@ -671,13 +634,17 @@ export function BlockSelector({ editor, isOpen, onClose, position }: BlockSelect
   // Функция для вставки блока HTML
   const insertBlock = (blockHtml: string) => {
     insertHtml(editor, blockHtml);
+    setTimeout(() => {
     onClose();
+    }, 0);
   };
 
   // Функция для вставки встроенного блока TipTap
   const insertBuiltInBlock = (action: (editor: any) => void) => {
     action(editor);
+    setTimeout(() => {
     onClose();
+    }, 0);
   };
 
   if (!isOpen) return null;
@@ -720,7 +687,7 @@ export function BlockSelector({ editor, isOpen, onClose, position }: BlockSelect
         
         <div className="border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
           <div className="flex p-1.5">
-            {(['Все', 'Основные', 'Медиа', 'Макеты', 'Выноски', 'Продвинутые', 'Стилизованные'] as BlockCategory[]).map((category) => (
+            {(['Все', 'Основные', 'Медиа', 'Макеты', 'Выноски', 'Продвинутые', 'Стилизованные', 'Notion'] as BlockCategory[]).map((category) => (
               <button
                 key={category}
                 onClick={() => setActiveCategory(category)}
@@ -769,3 +736,4 @@ export function BlockSelector({ editor, isOpen, onClose, position }: BlockSelect
     document.body
   );
 }
+

@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useEditor, EditorContent, Editor } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import Table from '@tiptap/extension-table';
 import TableRow from '@tiptap/extension-table-row';
@@ -24,15 +23,18 @@ import { FileDown, Plus, X, Type, Grid2x2 } from 'lucide-react';
 import { Toolbar } from './editor/Toolbar';
 import { BlockSelector } from './editor/BlockSelector';
 import { BlockSelector as HtmlBlockSelector } from './editor/BlockHtmlSelector';
-import { Extension } from '@tiptap/core';
-import { Plugin } from 'prosemirror-state';
+import { Extension, Node } from '@tiptap/core';
+import { Plugin, PluginKey } from 'prosemirror-state';
 import { Decoration, DecorationSet } from 'prosemirror-view';
 import ListItem from '@tiptap/extension-list-item';
 import Dropcursor from '@tiptap/extension-dropcursor';
 import Document from '@tiptap/extension-document';
+import StarterKit from '@tiptap/starter-kit';
 import { useAutoSave } from '../hooks/useAutoSave';
 import { autoSaveService } from '../services/autoSaveService';
 import { useIdleDetection } from '../hooks/useIdleDetection';
+import DOMPurify from 'dompurify';
+import { InteractiveKanbanNode } from './TiptapExtensions/InteractiveKanbanNode';
 
 // Импорт стилей из внешних файлов
 import './editor/styles/editorStyles.css';
@@ -94,6 +96,12 @@ const BlockMenu = ({ isOpen, onClose, position, editor }: BlockMenuProps) => {
           editor.chain().focus().setImage({ src: url }).run();
         }
         break;
+      case 'kanban':
+        editor.chain().focus().insertContent({
+          type: 'interactiveKanban',
+          attrs: {}
+        }).run();
+        break;
       default:
         break;
     }
@@ -119,94 +127,10 @@ const BlockMenu = ({ isOpen, onClose, position, editor }: BlockMenuProps) => {
           <div className="grid grid-cols-1 gap-1 mt-1">
             <button 
               className="flex items-center text-left rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-700"
-              onClick={() => handleAddBlock('heading1')}
+              onClick={() => handleAddBlock('kanban')}
             >
-              <span className="text-xl font-bold">H1</span>
-              <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Заголовок 1</span>
-            </button>
-            
-            <button 
-              className="flex items-center text-left rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-700"
-              onClick={() => handleAddBlock('heading2')}
-            >
-              <span className="text-lg font-bold">H2</span>
-              <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Заголовок 2</span>
-            </button>
-            
-            <button 
-              className="flex items-center text-left rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-700"
-              onClick={() => handleAddBlock('heading3')}
-            >
-              <span className="text-base font-bold">H3</span>
-              <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Заголовок 3</span>
-            </button>
-
-            <div className="my-1 border-t border-gray-200 dark:border-gray-700"></div>
-            
-            <button 
-              className="flex items-center text-left rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-700"
-              onClick={() => handleAddBlock('bulletList')}
-            >
-              <span className="text-lg">•</span>
-              <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Маркированный список</span>
-            </button>
-            
-            <button 
-              className="flex items-center text-left rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-700"
-              onClick={() => handleAddBlock('orderedList')}
-            >
-              <span className="text-lg">1.</span>
-              <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Нумерованный список</span>
-            </button>
-            
-            <button 
-              className="flex items-center text-left rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-700"
-              onClick={() => handleAddBlock('taskList')}
-            >
-              <span className="text-lg">☐</span>
-              <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Список задач</span>
-            </button>
-
-            <div className="my-1 border-t border-gray-200 dark:border-gray-700"></div>
-            
-            <button 
-              className="flex items-center text-left rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-700"
-              onClick={() => handleAddBlock('blockquote')}
-            >
-              <span className="text-lg">"</span>
-              <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Цитата</span>
-            </button>
-            
-            <button 
-              className="flex items-center text-left rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-700"
-              onClick={() => handleAddBlock('codeBlock')}
-            >
-              <span className="text-lg">{`</>`}</span>
-              <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Блок кода</span>
-            </button>
-
-            <button 
-              className="flex items-center text-left rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-700"
-              onClick={() => handleAddBlock('horizontalRule')}
-            >
-              <span className="text-lg">—</span>
-              <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Горизонтальная линия</span>
-            </button>
-
-            <button 
-              className="flex items-center text-left rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-700"
-              onClick={() => handleAddBlock('table')}
-            >
-              <span className="text-lg">⊞</span>
-              <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Таблица</span>
-            </button>
-            
-            <button 
-              className="flex items-center text-left rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-700"
-              onClick={() => handleAddBlock('image')}
-            >
-              <span className="text-lg">🖼️</span>
-              <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Изображение</span>
+              <span className="text-lg">📋</span>
+              <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Канбан-доска</span>
             </button>
           </div>
         </div>
@@ -321,6 +245,343 @@ const AllowClassesOnNodes = Extension.create({
       },
     ];
   },
+});
+
+// Создаем расширение для лучшей поддержки HTML
+const HtmlSupport = Extension.create({
+  name: 'htmlSupport',
+
+  addGlobalAttributes() {
+    return [
+      {
+        // Применяем только к блочным элементам, исключаем text
+        types: [
+          'paragraph', 
+          'heading',
+          // Убираем 'text', так как он не должен иметь атрибуты
+          'bulletList',
+          'orderedList', 
+          'listItem',
+          'blockquote',
+          'codeBlock',
+          'horizontalRule',
+          'image',
+          'taskList',
+          'taskItem',
+          'table',
+          'tableRow',
+          'tableCell',
+          'tableHeader'
+        ],
+        attributes: {
+          // Поддерживаем классы и стили
+          class: {},
+          style: {},
+          id: {},
+        }
+      }
+    ];
+  },
+});
+
+// Заменяем BlockContainer на HTMLBlockNode
+const HTMLBlockNode = Node.create({
+  name: 'htmlBlock',
+  group: 'block',
+  // Удаляем atom: true, чтобы обеспечить редактирование содержимого
+  content: 'block+', // Разрешаем внутренние блоки для редактирования
+  draggable: true,
+  
+  addAttributes() {
+    return {
+      class: { default: null },
+      style: { default: null },
+      id: { default: null },
+      'data-type': { default: 'html-block' }
+    };
+  },
+  
+  parseHTML() {
+    return [{ tag: 'div[data-type="html-block"]' }];
+  },
+  
+  renderHTML({ node, HTMLAttributes }) {
+    // Возвращаем div с нашим типом и сохраняем атрибуты
+    return ['div', { 
+      'data-type': 'html-block', 
+      ...HTMLAttributes 
+    }, 0]; // Добавляем 0 для обозначения контента
+  },
+  
+  addNodeView() {
+    return ({ node, editor, getPos, HTMLAttributes, extension, decorations }) => {
+      // Создаем контейнер
+      const dom = document.createElement('div');
+      dom.setAttribute('data-type', 'html-block');
+      dom.classList.add('tiptap-nodeview-block');
+      
+      // Создаем contentDOM для редактируемого содержимого
+      const contentDOM = document.createElement('div');
+      contentDOM.classList.add('tiptap-nodeview-content');
+      dom.appendChild(contentDOM);
+      
+      // Добавляем элемент для удаления блока
+      const deleteButton = document.createElement('button');
+      deleteButton.classList.add('tiptap-nodeview-delete');
+      deleteButton.innerHTML = '✕';
+      deleteButton.title = 'Удалить блок';
+      dom.appendChild(deleteButton);
+      
+      // Добавляем остальные атрибуты из узла
+      if (node.attrs.class) dom.classList.add(...node.attrs.class.split(/\s+/));
+      if (node.attrs.style) dom.setAttribute('style', node.attrs.style);
+      if (node.attrs.id) dom.id = node.attrs.id;
+      
+      // Обработчик удаления блока
+      const handleDelete = (event: MouseEvent) => {
+        event.preventDefault();
+        event.stopPropagation();
+        
+        if (typeof getPos === 'function') {
+          const pos = getPos();
+          editor.chain().focus().deleteRange({ from: pos, to: pos + node.nodeSize }).run();
+        }
+      };
+      deleteButton.addEventListener('click', handleDelete);
+      
+      // Добавляем обработчик клика для выделения узла
+      const handleClick = (event: MouseEvent) => {
+        if (typeof getPos === 'function' && (event.target === dom || event.target === deleteButton)) {
+          const pos = getPos();
+          editor.commands.setNodeSelection(pos);
+          dom.classList.add('tiptap-nodeview-selected');
+        }
+      };
+      
+      // Обработчик для предотвращения установки курсора вне contentDOM
+      const handleMouseDown = (event: MouseEvent) => {
+        // Если клик происходит на основном контейнере, но не внутри contentDOM,
+        // предотвращаем действие по умолчанию, чтобы не создавался новый блок
+        const target = event.target as Element;
+        const isClickInContent = contentDOM.contains(target) || target === contentDOM;
+        const isClickOnDelete = deleteButton.contains(target) || target === deleteButton;
+        
+        if (!isClickInContent && !isClickOnDelete && target === dom) {
+          event.preventDefault();
+          // Выделяем весь блок
+          if (typeof getPos === 'function') {
+            const pos = getPos();
+            editor.commands.setNodeSelection(pos);
+          }
+        }
+      };
+      
+      // Добавляем обработчик перетаскивания (для лучшего UX)
+      dom.draggable = true;
+      dom.addEventListener('dragstart', (event: DragEvent) => {
+        if (typeof getPos === 'function') {
+          const pos = getPos();
+          editor.commands.setNodeSelection(pos);
+        }
+      });
+      
+      // Добавляем обработчики событий
+      dom.addEventListener('click', handleClick);
+      dom.addEventListener('mousedown', handleMouseDown);
+      
+      return {
+        dom,
+        contentDOM, // Устанавливаем contentDOM для редактирования содержимого
+        update(updatedNode) {
+          if (updatedNode.type.name !== node.type.name) return false;
+          
+          // Обновляем атрибуты
+          if (updatedNode.attrs.class !== node.attrs.class) {
+            dom.className = 'tiptap-nodeview-block';
+            contentDOM.className = 'tiptap-nodeview-content';
+            if (updatedNode.attrs.class) dom.classList.add(...updatedNode.attrs.class.split(/\s+/));
+          }
+          
+          if (updatedNode.attrs.style !== node.attrs.style) {
+            if (updatedNode.attrs.style) dom.setAttribute('style', updatedNode.attrs.style);
+            else dom.removeAttribute('style');
+          }
+          
+          if (updatedNode.attrs.id !== node.attrs.id) {
+            if (updatedNode.attrs.id) dom.id = updatedNode.attrs.id;
+            else dom.removeAttribute('id');
+          }
+          
+          return true;
+        },
+        // Очистка ресурсов при удалении NodeView
+        destroy() {
+          dom.removeEventListener('click', handleClick);
+          dom.removeEventListener('mousedown', handleMouseDown);
+          deleteButton.removeEventListener('click', handleDelete);
+        }
+      };
+    };
+  }
+});
+
+// Создаем расширение для обработки вставки HTML
+const EnhancedPasteHandler = Extension.create({
+  name: 'enhancedPasteHandler',
+  
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        key: new PluginKey('enhancedPasteHandler'),
+        props: {
+          // Обработка вставки div-блоков из буфера обмена
+          transformPasted: (slice) => {
+            // Преобразование содержимого для сохранения div-блоков
+            // Эта функция будет вызвана при вставке контента
+            return slice;
+          },
+          
+          handlePaste: (view, event, slice) => {
+            // Обрабатываем вставку HTML-контента из буфера обмена
+            if (event.clipboardData && event.clipboardData.getData('text/html')) {
+              const html = event.clipboardData.getData('text/html');
+              
+              // Предварительная обработка HTML для сохранения div-блоков
+              const processedHtml = html
+                .replace(/<div([^>]*)>/g, '<div$1 data-type="block">')
+                .replace(/\n\s+/g, ' ')
+                .replace(/\s{2,}/g, ' ')
+                .trim();
+              
+              try {
+                // Вставляем через команду editor
+                setTimeout(() => {
+                  this.editor.commands.insertContent(processedHtml);
+                }, 0);
+                
+                return true;
+              } catch (error) {
+                console.error('Ошибка при обработке вставки HTML:', error);
+                // Если не удалось, продолжаем стандартную обработку
+                return false;
+              }
+            }
+            
+            return false;
+          }
+        }
+      })
+    ];
+  }
+});
+
+// Функция для безопасной вставки HTML-контента - обновляем для работы с новым HTMLBlockNode
+const insertStyledHtmlBlock = (editor: any, htmlContent: string) => {
+  try {
+    // Очищаем HTML от потенциально опасных элементов с помощью DOMPurify
+    const safeHtml = DOMPurify.sanitize(htmlContent, {
+      ALLOWED_TAGS: [
+        'p', 'div', 'span', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+        'ul', 'ol', 'li', 'a', 'strong', 'em', 'blockquote',
+        'code', 'pre', 'img', 'svg', 'path', 'figure', 'figcaption',
+        'table', 'tr', 'td', 'th', 'thead', 'tbody', 'time',
+        'mark', 'hr', 'br'
+      ],
+      ALLOWED_ATTR: [
+        'class', 'style', 'id', 'href', 'src', 'alt', 'title',
+        'width', 'height', 'fill', 'stroke', 'viewBox', 'xmlns',
+        'stroke-width', 'stroke-linecap', 'stroke-linejoin',
+        'fill-rule', 'clip-rule', 'd', 'transform', 'data-*'
+      ],
+      ADD_TAGS: ['svg', 'path', 'circle', 'rect', 'line', 'g', 'polyline', 'polygon'],
+      ALLOW_DATA_ATTR: true
+    });
+    
+    // Очистка от лишних пробелов и переносов строк
+    const cleanHtml = safeHtml
+      .replace(/\n\s+/g, ' ')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+    
+    // Создаем временный div для анализа структуры HTML
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = cleanHtml;
+    
+    // Извлекаем атрибуты из корневого элемента, если это div
+    const rootElement = tempDiv.firstElementChild;
+    const attrs: Record<string, any> = {
+      'data-type': 'html-block'
+    };
+    
+    if (rootElement) {
+      if (rootElement.className) attrs.class = rootElement.className;
+      if (rootElement.getAttribute('style')) attrs.style = rootElement.getAttribute('style');
+      if (rootElement.id) attrs.id = rootElement.id;
+    }
+    
+    // Создаем HTMLBlockNode с извлеченными атрибутами
+    const htmlBlockNode = {
+      type: 'htmlBlock',
+      attrs: attrs,
+      content: []
+    };
+    
+    // Вставляем внутреннее содержимое как HTML
+    // Это позволит редактору правильно распарсить и вставить содержимое
+    editor.chain().focus().insertContent({
+      type: 'htmlBlock',
+      attrs: attrs,
+      content: editor.schema.nodeFromJSON({
+        type: 'paragraph',
+        content: [
+          {
+            type: 'text',
+            text: ' ' // Пробел для обеспечения редактируемости
+          }
+        ]
+      })
+    }).run();
+    
+    // После вставки блока, в следующем тике вставляем HTML-содержимое
+    setTimeout(() => {
+      // Очищаем содержимое блока
+      const selection = editor.state.selection;
+      const nodePos = selection.$anchor.pos - 1;
+      
+      // Вставляем обработанный HTML
+      editor.commands.insertContentAt(nodePos, cleanHtml);
+      
+      // Фокусируемся на редакторе
+      editor.commands.focus();
+    }, 0);
+    
+    return true;
+  } catch (error) {
+    console.error('Ошибка при вставке HTML-блока:', error);
+    
+    // Запасной вариант - вставляем просто текст
+    try {
+      const plainText = htmlContent.replace(/<[^>]*>/g, ' ').trim();
+      editor.chain().focus().insertContent(plainText).run();
+    } catch (fallbackError) {
+      console.error('Ошибка при вставке текста:', fallbackError);
+    }
+    
+    return false;
+  }
+};
+
+// Добавляем метод в расширение для доступа из компонентов
+const insertStyledHtmlBlockExtension = Extension.create({
+  name: 'insertStyledHtmlBlock',
+  
+  addCommands() {
+    return {
+      insertStyledHtmlBlock: (htmlContent: string) => ({ editor }) => {
+        return insertStyledHtmlBlock(editor, htmlContent);
+      }
+    };
+  }
 });
 
 interface RichTextEditorProps {
@@ -539,6 +800,78 @@ export function RichTextEditor({
         nested: true
       }),
       AllowClassesOnNodes,
+      HtmlSupport.configure({
+        rules: [
+          {
+            // Применяем только к блочным элементам, исключаем text
+            types: [
+              'paragraph', 
+              'heading',
+              'bulletList',
+              'orderedList', 
+              'listItem',
+              'blockquote',
+              'codeBlock',
+              'horizontalRule',
+              'image',
+              'taskList',
+              'taskItem',
+              'table',
+              'tableRow',
+              'tableCell',
+              'tableHeader',
+              'htmlBlock',
+              'interactiveKanban'
+            ],
+            attributes: {
+              class: {
+                default: null,
+                parseHTML: (element: HTMLElement) => element.getAttribute('class'),
+                renderHTML: (attributes: { class?: string }) => {
+                  if (!attributes.class) return {};
+                  return { class: attributes.class };
+                },
+              },
+              style: {
+                default: null,
+                parseHTML: (element: HTMLElement) => element.getAttribute('style'),
+                renderHTML: (attributes: { style?: string }) => {
+                  if (!attributes.style) return {};
+                  return { style: attributes.style };
+                },
+              },
+              id: {
+                default: null,
+                parseHTML: (element: HTMLElement) => element.getAttribute('id'),
+                renderHTML: (attributes: { id?: string }) => {
+                  if (!attributes.id) return {};
+                  return { id: attributes.id };
+                },
+              },
+              'data-type': {
+                default: null,
+                parseHTML: (element: HTMLElement) => element.getAttribute('data-type'),
+                renderHTML: (attributes: { 'data-type'?: string }) => {
+                  if (!attributes['data-type']) return {};
+                  return { 'data-type': attributes['data-type'] };
+                },
+              },
+              'data-board-state': {
+                default: null,
+                parseHTML: (element: HTMLElement) => element.getAttribute('data-board-state'),
+                renderHTML: (attributes: { 'data-board-state'?: string }) => {
+                  if (!attributes['data-board-state']) return {};
+                  return { 'data-board-state': attributes['data-board-state'] };
+                },
+              }
+            }
+          }
+        ],
+      }),
+      HTMLBlockNode, // Используем новый HTMLBlockNode вместо BlockContainer
+      insertStyledHtmlBlockExtension, // Добавляем наше расширение
+      EnhancedPasteHandler, // Добавляем расширение для обработки вставки HTML
+      InteractiveKanbanNode,
     ],
     content,
     editable: true,
@@ -551,6 +884,15 @@ export function RichTextEditor({
         setCurrentContent(html); // Обновляем локальное состояние
         setHasChanges(true); // Отмечаем, что есть изменения
         onChange(html); // Уведомляем родительский компонент
+      } else {
+        // Даже если HTML не изменился, но произошли внутренние обновления (например, в канбан-доске),
+        // все равно считаем это изменением
+        const transaction = editor.state.tr;
+        if (transaction.docChanged) {
+          console.log('Обнаружены внутренние изменения (возможно, в канбан-доске)');
+          setHasChanges(true);
+          onChange(html); // Уведомляем родительский компонент о необходимости сохранения
+        }
       }
     },
     autofocus: 'end',
@@ -774,47 +1116,6 @@ export function RichTextEditor({
     setShowBlockSelector(true);
   };
 
-  // Функция для обработки вставки HTML блоков с сохранением стилей
-  const insertStyledHtmlBlock = (editor: Editor, html: string): boolean => {
-    try {
-      // Преобразование HTML в DOM
-      const div = document.createElement('div');
-      div.innerHTML = html;
-      
-      // Применение дополнительной обработки, если необходимо
-      // Например, можно добавить дополнительные стили или атрибуты
-      
-      // Вставка HTML с сохранением всех атрибутов и стилей
-      editor.commands.insertContent({
-        type: 'doc',
-        content: [
-          {
-            type: 'html',
-            content: [
-              {
-                type: 'text',
-                text: html,
-              },
-            ],
-          },
-        ],
-      });
-      
-      return true;
-    } catch (error) {
-      console.error('Ошибка при вставке стилизованного HTML блока:', error);
-      return false;
-    }
-  };
-  
-  // Заменяем функцию insertContent в BlockSelector
-  useEffect(() => {
-    if (editor) {
-      // Предоставляем функцию insertStyledHtmlBlock через API редактора
-      editor.commands.insertStyledHtmlBlock = (html: string) => insertStyledHtmlBlock(editor, html);
-    }
-  }, [editor]);
-
   // Перед размонтированием компонента принудительно сохраняем изменения
   useEffect(() => {
     return () => {
@@ -877,3 +1178,4 @@ export function RichTextEditor({
     </div>
   );
 }
+

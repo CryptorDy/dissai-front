@@ -160,11 +160,6 @@ export function KnowledgeFileStructure({
 
   // Функция для обработки клика по элементу
   const handleItemClick = useCallback((item: KnowledgeItem) => {
-    // Проверяем, имеет ли элемент временный ID
-    if (item.id.startsWith('temp-')) {
-      console.log('КFS: Выбран элемент с временным ID:', item.id);
-    }
-    
     // Передаем выбранный элемент родительскому компоненту
     // Если это папка, она будет только выбрана, но содержимое не будет отображаться
     onSelectItem(item);

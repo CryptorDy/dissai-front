@@ -1,0 +1,97 @@
+/* Стили для канбан-доски */
+
+/* Обертка компонента */
+.interactive-kanban-wrapper {
+  margin: 1rem 0;
+  user-select: none;
+}
+
+/* Контент доски с отключенным contentEditable */
+.kanban-board-react-content {
+  position: relative;
+  width: 100%;
+  -webkit-user-modify: read-only;
+  overflow: hidden;
+}
+
+/* Запрет редактирования внутри компонента через ProseMirror */
+.interactive-kanban-wrapper * {
+  caret-color: transparent;
+}
+
+/* Возвращаем курсор для полей ввода */
+.interactive-kanban-wrapper input,
+.interactive-kanban-wrapper textarea,
+.interactive-kanban-wrapper button {
+  caret-color: auto;
+}
+
+/* Стили для канбан-колонки */
+.kanban-column {
+  display: flex;
+  flex-direction: column;
+  min-height: 200px;
+  transition: background-color 0.2s ease;
+}
+
+/* Заголовок колонки */
+.kanban-column-header {
+  margin-bottom: 0.75rem;
+}
+
+/* Карточка в канбане */
+.kanban-card {
+  transition: all 0.2s ease;
+}
+
+.kanban-card:hover {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Для поля редактирования в карточке */
+.kanban-card textarea {
+  min-height: 1.5rem;
+  line-height: 1.25;
+}
+
+/* Когда карточка перетаскивается (для интеграции с react-beautiful-dnd) */
+.kanban-card.is-dragging {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  opacity: 0.9;
+}
+
+/* Исправляем стили для темного режима */
+@media (prefers-color-scheme: dark) {
+  .kanban-card {
+    color: #e2e8f0;
+  }
+  
+  .kanban-card:hover {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1);
+  }
+}
+
+/* Стили для кнопки добавления карточки */
+.kanban-column button {
+  opacity: 0.85;
+  transition: opacity 0.2s ease;
+}
+
+.kanban-column button:hover {
+  opacity: 1;
+}
+
+/* Убираем стандартные стили Tailwind Typography, если они мешают */
+.not-prose * {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+/* Дополнительные стили для элементов, которые будут добавлены через react-beautiful-dnd */
+.drag-handle {
+  cursor: grab;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+} 

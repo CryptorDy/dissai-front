@@ -128,8 +128,6 @@ function mapKnowledgeItemToApi(item: KnowledgeItem): any {
     return null;
   }
   
-  console.log('mapKnowledgeItemToApi: Входные данные:', JSON.stringify(item));
-
   // Преобразуем данные без добавления значений по умолчанию
   const result = {
     id: item.id,
@@ -141,15 +139,12 @@ function mapKnowledgeItemToApi(item: KnowledgeItem): any {
     children: item.children ? item.children.map(child => mapKnowledgeItemToApi(child)) : [],
     metadata: item.metadata
   };
-  
-  console.log('mapKnowledgeItemToApi: Результат преобразования:', JSON.stringify(result));
   return result;
 }
 
 // Вспомогательная функция для преобразования API элемента в KnowledgeItem
 function mapApiItemToKnowledgeItem(item: KnowledgeItemDto): KnowledgeItem {
   // Добавляем логирование входных данных
-  console.log('mapApiItemToKnowledgeItem: Входные данные:', JSON.stringify(item));
   
   if (!item) {
     console.error('mapApiItemToKnowledgeItem: Получен пустой объект!');
@@ -161,8 +156,6 @@ function mapApiItemToKnowledgeItem(item: KnowledgeItemDto): KnowledgeItem {
     };
   }
   
-  // Логируем id перед его использованием
-  console.log('mapApiItemToKnowledgeItem: ID в ответе:', item.id);
   
   const result: KnowledgeItem = {
     id: item.id || '', // Используем пустую строку, если id не определен
@@ -177,9 +170,6 @@ function mapApiItemToKnowledgeItem(item: KnowledgeItemDto): KnowledgeItem {
     parentId: item.parentId,
     metadata: item.metadata
   };
-  
-  // Логируем результат 
-  console.log('mapApiItemToKnowledgeItem: Результат преобразования:', JSON.stringify(result));
   
   return result;
 }
