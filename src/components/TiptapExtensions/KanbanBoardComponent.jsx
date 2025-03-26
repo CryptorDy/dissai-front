@@ -1,9 +1,8 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { NodeViewWrapper } from '@tiptap/react';
 
-// Подключаем библиотеку для drag-and-drop
-import { DndProvider, useDrag, useDrop } from 'react-dnd';
-import { HTML5Backend } from 'react-dnd-html5-backend';
+// Удалено использование react-dnd
+// import { useDrag, useDrop } from 'react-dnd';
 
 // Стили компонента
 import './KanbanBoardComponent.css';
@@ -11,16 +10,8 @@ import './KanbanBoardComponent.css';
 // Вспомогательная функция для генерации ID
 const generateId = () => `id-${Math.random().toString(36).substr(2, 9)}`;
 
-// Компонент карточки с поддержкой drag-and-drop
-const DraggableCard = ({ card, columnId, handleDeleteCard, handleCardTitleChange, handleCardDescriptionChange, handleCardPriorityChange, moveCard }) => {
-  const [{ isDragging }, drag] = useDrag({
-    type: 'CARD',
-    item: { id: card.id, sourceColumnId: columnId },
-    collect: monitor => ({
-      isDragging: !!monitor.isDragging(),
-    }),
-  });
-
+// Компонент карточки с поддержкой перетаскивания
+const DraggableCard = ({ card, columnId, handleDeleteCard, handleCardTitleChange, handleCardDescriptionChange, handleCardPriorityChange, handleDragStart }) => {
   // Определяем цвет полоски в зависимости от приоритета и колонки
   let borderLeftColor = '#e5e7eb'; // Цвет по умолчанию - серый
   // Только для колонок "Планируется" и "Завершено" показываем цветные полоски
@@ -49,9 +40,16 @@ const DraggableCard = ({ card, columnId, handleDeleteCard, handleCardTitleChange
   }
 
   return (
-    <div className="card-wrapper" style={{ marginBottom: '15px' }}>
+    <div 
+      className="card-wrapper" 
+      style={{ marginBottom: '15px' }}
+      draggable
+      onDragStart={(e) => {
+        e.stopPropagation();
+        handleDragStart(card.id, columnId, e);
+      }}
+    >
       <div
-        ref={drag}
         className={`kanban-card p-2 rounded-md shadow-sm hover:shadow-md relative group border ${cardBgClass}`}
         onMouseDown={e => {
           e.stopPropagation();
@@ -64,7 +62,6 @@ const DraggableCard = ({ card, columnId, handleDeleteCard, handleCardTitleChange
         style={{ 
           borderLeftWidth: '4px',
           borderLeftColor: borderLeftColor,
-          opacity: isDragging ? 0.5 : 1,
           cursor: 'grab'
         }}
       >
@@ -132,20 +129,19 @@ const DraggableCard = ({ card, columnId, handleDeleteCard, handleCardTitleChange
 };
 
 // Компонент колонки с поддержкой drop
-const DroppableColumn = ({ column, cards, handleColumnTitleChange, handleAddCard, handleDeleteCard, handleCardTitleChange, handleCardDescriptionChange, handleCardPriorityChange, moveCard, isFirstColumn }) => {
-  const [, drop] = useDrop({
-    accept: 'CARD',
-    drop: (item) => {
-      if (item.sourceColumnId !== column.id) {
-        moveCard(item.id, item.sourceColumnId, column.id);
-      }
-    },
-  });
-
+const DroppableColumn = ({ column, cards, handleColumnTitleChange, handleAddCard, handleDeleteCard, handleCardTitleChange, handleCardDescriptionChange, handleCardPriorityChange, handleDragStart, handleDrop, isFirstColumn }) => {
   return (
     <div
-      ref={drop}
       className="kanban-column bg-gray-50 dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700"
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        handleDrop(column.id, e);
+      }}
     >
       <div className="kanban-column-header flex items-center justify-between mb-3">
         <input
@@ -171,7 +167,7 @@ const DroppableColumn = ({ column, cards, handleColumnTitleChange, handleAddCard
             handleCardTitleChange={handleCardTitleChange}
             handleCardDescriptionChange={handleCardDescriptionChange}
             handleCardPriorityChange={handleCardPriorityChange}
-            moveCard={moveCard}
+            handleDragStart={handleDragStart}
           />
         ))}
       </div>
@@ -195,6 +191,10 @@ const DroppableColumn = ({ column, cards, handleColumnTitleChange, handleAddCard
 
 const KanbanBoardComponent = (props) => {
   const { node, updateAttributes, editor } = props;
+  
+  // Состояние для drag and drop
+  const [draggedCardId, setDraggedCardId] = useState(null);
+  const [draggedFromColumnId, setDraggedFromColumnId] = useState(null);
 
   // Инициализируем состояние из атрибутов ноды Tiptap
   const initialBoardState = node.attrs.boardState || {
@@ -209,6 +209,7 @@ const KanbanBoardComponent = (props) => {
       'card-3': { id: 'card-3', title: 'Задача 3', description: 'Описание задачи 3', priority: 'high' },
     },
     columnOrder: ['col-1', 'col-2', 'col-3'],
+    boardTitle: 'Канбан-доска проекта',
   };
 
   const [boardState, setBoardState] = useState(initialBoardState);
@@ -224,6 +225,32 @@ const KanbanBoardComponent = (props) => {
   }, [updateAttributes, editor.isEditable]);
 
   // Обработчики событий
+
+  // Начало перетаскивания карточки
+  const handleDragStart = (cardId, sourceColumnId, e) => {
+    setDraggedCardId(cardId);
+    setDraggedFromColumnId(sourceColumnId);
+    
+    // Добавляем данные в dataTransfer для обработки при drop
+    e.dataTransfer.setData('application/kanban', JSON.stringify({
+      cardId,
+      sourceColumnId
+    }));
+    
+    // Устанавливаем вид курсора
+    e.dataTransfer.effectAllowed = 'move';
+  };
+  
+  // Обработка событий drop
+  const handleDrop = (destinationColumnId) => {
+    if (draggedCardId && draggedFromColumnId && draggedFromColumnId !== destinationColumnId) {
+      moveCard(draggedCardId, draggedFromColumnId, destinationColumnId);
+      
+      // Сбрасываем состояние перетаскивания
+      setDraggedCardId(null);
+      setDraggedFromColumnId(null);
+    }
+  };
 
   // Изменение заголовка карточки
   const handleCardTitleChange = (cardId, newTitle) => {
@@ -398,6 +425,16 @@ const KanbanBoardComponent = (props) => {
 
   const stats = calculateStats();
 
+  // Изменение заголовка доски
+  const handleBoardTitleChange = (newTitle) => {
+    const newState = {
+      ...boardState,
+      boardTitle: newTitle
+    };
+    setBoardState(newState);
+    saveStateToTiptap(newState);
+  };
+
   // Рендеринг компонента
   return (
     <NodeViewWrapper 
@@ -430,9 +467,32 @@ const KanbanBoardComponent = (props) => {
         }}
       >
         <div className="p-4 flex flex-col md:flex-row justify-between items-start md:items-center">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2 md:mb-0 w-1/3">
-            Канбан-доска проекта
-          </h3>
+          <div className="text-lg font-medium text-gray-900 dark:text-white mb-2 md:mb-0 w-1/3">
+            <input
+              type="text"
+              value={boardState.boardTitle}
+              onChange={(e) => {
+                e.stopPropagation();
+                handleBoardTitleChange(e.target.value);
+              }}
+              onInput={(e) => {
+                e.stopPropagation();
+                handleBoardTitleChange(e.target.value);
+              }}
+              onKeyDown={(e) => e.stopPropagation()}
+              onFocus={(e) => e.target.select()}
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+              }}
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+              }}
+              className="kanban-board-title bg-transparent border-none focus:ring-0 p-0 w-full text-lg font-medium text-gray-900 dark:text-white"
+              placeholder="Название доски"
+            />
+          </div>
           
           <div className="filters-container flex flex-col sm:flex-row gap-2 w-full md:w-auto md:justify-end md:ml-auto" style={{ justifyContent: 'flex-end' }}>
             <div className="relative">
@@ -444,9 +504,21 @@ const KanbanBoardComponent = (props) => {
                   e.stopPropagation();
                   setFilterText(e.target.value);
                 }}
+                onInput={(e) => {
+                  e.stopPropagation();
+                  setFilterText(e.target.value);
+                }}
+                onFocus={(e) => e.stopPropagation()}
                 onKeyDown={(e) => e.stopPropagation()}
-                onClick={(e) => e.stopPropagation()}
-                className="text-sm rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-1 px-3 text-gray-900 dark:text-white w-full sm:w-48"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                }}
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                }}
+                className="kanban-board-search text-sm rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-1 px-3 text-gray-900 dark:text-white w-full sm:w-48"
               />
               {filterText && (
                 <button
@@ -511,35 +583,34 @@ const KanbanBoardComponent = (props) => {
           </div>
         </div>
         
-        <DndProvider backend={HTML5Backend}>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4">
-            {boardState.columnOrder?.map((columnId, index) => {
-              const column = boardState.columns.find(c => c.id === columnId);
-              if (!column) return null;
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4">
+          {boardState.columnOrder?.map((columnId, index) => {
+            const column = boardState.columns.find(c => c.id === columnId);
+            if (!column) return null;
 
-              // Фильтрованные карточки
-              const cards = filteredCards(columnId, column.cardIds);
-              // Первая колонка (Планируется)
-              const isFirstColumn = index === 0;
+            // Фильтрованные карточки
+            const cards = filteredCards(columnId, column.cardIds);
+            // Первая колонка (Планируется)
+            const isFirstColumn = index === 0;
 
-              return (
-                <DroppableColumn
-                  key={column.id}
-                  column={column}
-                  cards={cards}
-                  handleColumnTitleChange={handleColumnTitleChange}
-                  handleAddCard={handleAddCard}
-                  handleDeleteCard={handleDeleteCard}
-                  handleCardTitleChange={handleCardTitleChange}
-                  handleCardDescriptionChange={handleCardDescriptionChange}
-                  handleCardPriorityChange={handleCardPriorityChange}
-                  moveCard={moveCard}
-                  isFirstColumn={isFirstColumn}
-                />
-              );
-            })}
-          </div>
-        </DndProvider>
+            return (
+              <DroppableColumn
+                key={column.id}
+                column={column}
+                cards={cards}
+                handleColumnTitleChange={handleColumnTitleChange}
+                handleAddCard={handleAddCard}
+                handleDeleteCard={handleDeleteCard}
+                handleCardTitleChange={handleCardTitleChange}
+                handleCardDescriptionChange={handleCardDescriptionChange}
+                handleCardPriorityChange={handleCardPriorityChange}
+                handleDragStart={handleDragStart}
+                handleDrop={handleDrop}
+                isFirstColumn={isFirstColumn}
+              />
+            );
+          })}
+        </div>
       </div>
     </NodeViewWrapper>
   );

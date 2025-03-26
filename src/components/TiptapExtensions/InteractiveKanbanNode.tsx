@@ -1,6 +1,7 @@
 import { mergeAttributes, Node, nodeInputRule } from '@tiptap/core';
 import { ReactNodeViewRenderer } from '@tiptap/react';
 import { Plugin, PluginKey } from 'prosemirror-state';
+import React from 'react';
 import KanbanBoardComponent from './KanbanBoardComponent';
 
 // Определение интерфейса для аттрибутов канбан-доски
@@ -24,35 +25,11 @@ export const InteractiveKanbanNode = Node.create<{
 
   draggable: true,
 
+  // Добавление атрибутов
   addAttributes() {
     return {
       boardState: {
-        default: JSON.stringify({
-          // Начальное состояние канбан-доски
-          cards: {
-            'card-1': { id: 'card-1', title: 'Задача 1', description: 'Описание задачи 1' },
-            'card-2': { id: 'card-2', title: 'Задача 2', description: 'Описание задачи 2' },
-            'card-3': { id: 'card-3', title: 'Задача 3', description: 'Описание задачи 3' },
-          },
-          columns: [
-            {
-              id: 'column-1',
-              title: 'Планируется',
-              cardIds: ['card-1'],
-            },
-            {
-              id: 'column-2',
-              title: 'В процессе',
-              cardIds: ['card-2'],
-            },
-            {
-              id: 'column-3',
-              title: 'Завершено',
-              cardIds: ['card-3'],
-            },
-          ],
-          columnOrder: ['column-1', 'column-2', 'column-3'],
-        }),
+        default: null,
       },
     };
   },
@@ -61,67 +38,14 @@ export const InteractiveKanbanNode = Node.create<{
   parseHTML() {
     return [
       {
-        tag: 'div[data-type="interactive-kanban"]',
-        getAttrs: (node) => {
-          if (!(node instanceof HTMLElement)) {
-            return {};
-          }
-
-          try {
-            // Извлекаем состояние доски из атрибута data-board-state
-            const boardStateStr = node.getAttribute('data-board-state');
-            if (boardStateStr) {
-              // Пытаемся распарсить JSON
-              const boardState = JSON.parse(boardStateStr);
-              console.log('Восстановлено состояние доски:', boardState);
-              return { boardState };
-            }
-          } catch (error) {
-            console.error('Ошибка при парсинге состояния доски:', error);
-          }
-          
-          return {};
-        }
+        tag: 'div.interactive-kanban',
       },
     ];
   },
 
   // Функция для рендеринга HTML
   renderHTML({ HTMLAttributes }) {
-    try {
-      const attrs = mergeAttributes(HTMLAttributes);
-      let boardStateString = '';
-      
-      // Преобразуем boardState в строку, если это объект
-      if (typeof attrs.boardState === 'object' && attrs.boardState !== null) {
-        boardStateString = JSON.stringify(attrs.boardState);
-      } else if (typeof attrs.boardState === 'string') {
-        // Проверяем, что строка валидный JSON
-        try {
-          JSON.parse(attrs.boardState);
-          boardStateString = attrs.boardState;
-        } catch (e) {
-          console.error('Невалидный JSON в attrs.boardState:', e);
-          boardStateString = '{}';
-        }
-      } else {
-        boardStateString = '{}';
-      }
-      
-      // Для отладки
-      console.log("renderHTML для канбан-доски:", boardStateString.slice(0, 50) + '...');
-      
-      return ['div', { 
-        'data-type': 'interactive-kanban',
-        'data-board-state': boardStateString,
-        'contenteditable': 'false',
-        'class': 'interactive-kanban-container',
-        'style': 'min-height: 100px; background-color: #f9fafb; border: 1px dashed #d1d5db; border-radius: 0.375rem; margin: 1rem 0;'
-      }, ['div', { class: 'kanban-placeholder' }, 'Канбан-доска']];
-    } catch (error) {
-      console.error('Ошибка при рендеринге канбан-доски:', error);
-      return ['div', { 'data-type': 'interactive-kanban', 'class': 'interactive-kanban-error' }, 'Ошибка загрузки канбан-доски'];
-    }
+    return ['div', mergeAttributes(HTMLAttributes, { class: 'interactive-kanban' })];
   },
 
   // Добавляем поддержку для отображения в редакторе
