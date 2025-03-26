@@ -3,6 +3,7 @@
 /* Обертка компонента */
 .interactive-kanban-wrapper {
   margin: 1rem 0;
+  pointer-events: auto;
   user-select: none;
   border-radius: 0.5rem;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
@@ -17,13 +18,18 @@
 .kanban-board-react-content {
   position: relative;
   width: 100%;
-  -webkit-user-modify: read-only;
+  pointer-events: auto;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
   overflow: hidden;
 }
 
 /* Запрет редактирования внутри компонента через ProseMirror */
 .interactive-kanban-wrapper * {
   caret-color: transparent;
+  pointer-events: auto;
 }
 
 /* Возвращаем курсор для полей ввода */
@@ -147,4 +153,20 @@
 
 .drag-handle:active {
   cursor: grabbing;
+}
+
+/* Выравнивание фильтров справа */
+.interactive-kanban-wrapper .filters-container {
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+/* Предотвращаем редактируемость */
+.interactive-kanban-wrapper [contenteditable=true] {
+  pointer-events: none;
+}
+
+/* Стили для коррекции отступов */
+.card-wrapper {
+  margin-bottom: 8px !important;
 } 
