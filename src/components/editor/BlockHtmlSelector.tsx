@@ -53,6 +53,10 @@ type Block = {
   categories: BlockCategory[];
   action?: (editor: any) => void;
   html?: string;
+  insert?: {
+    type: string;
+    attrs: any;
+  };
 };
 
 const insertHtml = (editor: any, html: string) => {
@@ -397,89 +401,8 @@ export function BlockSelector({ editor, isOpen, onClose, position }: BlockSelect
       </div>`
     },
     {
-      id: 'cssTaskList',
-      title: 'Список задач CSS',
-      description: 'Интерактивный список задач без JavaScript',
-      icon: <CheckSquare className="w-4 h-4 text-green-500" />,
-      categories: ['Все', 'Notion'],
-      html: `<div class="task-list-block p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" data-type="html-block">
-        <h3 class="text-base font-medium text-gray-900 dark:text-white mb-4">Список задач</h3>
-        <div class="space-y-3">
-          <div class="task-item">
-            <input type="checkbox" id="task1" class="task-checkbox peer hidden" />
-            <label for="task1" class="flex items-center cursor-pointer">
-              <span class="task-checkbox-icon flex-shrink-0 w-5 h-5 border border-gray-300 dark:border-gray-600 rounded mr-3 flex items-center justify-center peer-checked:bg-blue-500 peer-checked:border-blue-500 dark:peer-checked:bg-blue-600 dark:peer-checked:border-blue-600 transition-colors">
-                <svg class="w-3 h-3 text-white opacity-0 peer-checked:opacity-100" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" />
-          </svg>
-              </span>
-              <span class="text-gray-700 dark:text-gray-300 peer-checked:text-gray-500 dark:peer-checked:text-gray-400 peer-checked:line-through transition-colors">Первая задача</span>
-            </label>
-        </div>
-          
-          <div class="task-item">
-            <input type="checkbox" id="task2" class="task-checkbox peer hidden" checked />
-            <label for="task2" class="flex items-center cursor-pointer">
-              <span class="task-checkbox-icon flex-shrink-0 w-5 h-5 border border-gray-300 dark:border-gray-600 rounded mr-3 flex items-center justify-center peer-checked:bg-blue-500 peer-checked:border-blue-500 dark:peer-checked:bg-blue-600 dark:peer-checked:border-blue-600 transition-colors">
-                <svg class="w-3 h-3 text-white opacity-0 peer-checked:opacity-100" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" />
-                </svg>
-              </span>
-              <span class="text-gray-700 dark:text-gray-300 peer-checked:text-gray-500 dark:peer-checked:text-gray-400 peer-checked:line-through transition-colors">Выполненная задача</span>
-            </label>
-            </div>
-          
-          <div class="task-item">
-            <input type="checkbox" id="task3" class="task-checkbox peer hidden" />
-            <label for="task3" class="flex items-center cursor-pointer">
-              <span class="task-checkbox-icon flex-shrink-0 w-5 h-5 border border-gray-300 dark:border-gray-600 rounded mr-3 flex items-center justify-center peer-checked:bg-blue-500 peer-checked:border-blue-500 dark:peer-checked:bg-blue-600 dark:peer-checked:border-blue-600 transition-colors">
-                <svg class="w-3 h-3 text-white opacity-0 peer-checked:opacity-100" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" />
-                </svg>
-              </span>
-              <span class="text-gray-700 dark:text-gray-300 peer-checked:text-gray-500 dark:peer-checked:text-gray-400 peer-checked:line-through transition-colors">Третья задача с длинным описанием, чтобы проверить перенос строк при большом количестве текста</span>
-            </label>
-            </div>
-          
-          <div class="task-item">
-            <input type="checkbox" id="task4" class="task-checkbox peer hidden" />
-            <label for="task4" class="flex items-center cursor-pointer">
-              <span class="task-checkbox-icon flex-shrink-0 w-5 h-5 border border-gray-300 dark:border-gray-600 rounded mr-3 flex items-center justify-center peer-checked:bg-blue-500 peer-checked:border-blue-500 dark:peer-checked:bg-blue-600 dark:peer-checked:border-blue-600 transition-colors">
-                <svg class="w-3 h-3 text-white opacity-0 peer-checked:opacity-100" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" />
-                </svg>
-              </span>
-              <span class="text-gray-700 dark:text-gray-300 peer-checked:text-gray-500 dark:peer-checked:text-gray-400 peer-checked:line-through transition-colors">Срочная задача</span>
-              <span class="ml-2 px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-xs rounded">Срочно</span>
-            </label>
-            </div>
-          
-          <div class="task-item">
-            <input type="checkbox" id="task5" class="task-checkbox peer hidden" />
-            <label for="task5" class="flex items-center cursor-pointer">
-              <span class="task-checkbox-icon flex-shrink-0 w-5 h-5 border border-gray-300 dark:border-gray-600 rounded mr-3 flex items-center justify-center peer-checked:bg-blue-500 peer-checked:border-blue-500 dark:peer-checked:bg-blue-600 dark:peer-checked:border-blue-600 transition-colors">
-                <svg class="w-3 h-3 text-white opacity-0 peer-checked:opacity-100" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" />
-                </svg>
-              </span>
-              <span class="text-gray-700 dark:text-gray-300 peer-checked:text-gray-500 dark:peer-checked:text-gray-400 peer-checked:line-through transition-colors">Добавить новую задачу в список</span>
-            </label>
-          </div>
-        </div>
-        
-        <div class="mt-4 border-t border-gray-200 dark:border-gray-700 pt-4">
-          <div class="flex items-center text-gray-500 dark:text-gray-400 text-sm">
-            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-            <span>Нажмите на чекбокс, чтобы отметить задачу как выполненную</span>
-          </div>
-        </div>
-      </div>`
-    },
-    {
       id: 'cssTaskListAdvanced',
-      title: 'Список задач с приоритетами',
+      title: 'Список задач',
       description: 'Расширенный список задач с метками',
       icon: <CheckSquare className="w-4 h-4 text-blue-500" />,
       categories: ['Все', 'Notion'],
@@ -573,17 +496,12 @@ export function BlockSelector({ editor, isOpen, onClose, position }: BlockSelect
     {
       id: 'kanban-board',
       title: 'Канбан-доска',
-      description: 'Доска задач с возможностью перетаскивания',
-      icon: <Grid2x2 className="w-4 h-4 text-blue-500" />,
+      description: 'Добавить канбан-доску для управления задачами',
+      icon: <Grid2x2 size={20} className="mr-2" />,
       categories: ['Все', 'Продвинутые', 'Макеты'],
-      action: (editor) => {
-        editor.chain().focus().insertContent({
-          type: 'interactiveKanban',
-          attrs: {
-            boardState: null
-          }
-        }).run();
-        onClose();
+      insert: {
+        type: 'kanbanBoard',
+        attrs: {}
       }
     }
   ];

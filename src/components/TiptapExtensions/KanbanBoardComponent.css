@@ -8,12 +8,29 @@
   margin-bottom: 1em;
   box-sizing: border-box;
   border-radius: 0.5rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  box-shadow: none;
   transition: all 0.2s ease;
+  display: block;
+  width: 100%;
+  clear: both;
 }
 
 .interactive-kanban-wrapper:hover {
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  box-shadow: none;
+}
+
+/* Специальная область для клика после канбана - увеличиваем область */
+.interactive-kanban-wrapper::after {
+  content: "";
+  display: block;
+  height: 30px; /* Увеличиваем высоту для лучшего попадания */
+  width: 100%;
+  pointer-events: auto; /* Позволяем кликать по этому элементу */
+  position: relative;
+  clear: both;
+  margin-bottom: 10px;
+  background-color: transparent;
+  cursor: text; /* Показываем курсор для текста */
 }
 
 /* Контент доски с отключенным contentEditable */
@@ -89,7 +106,15 @@
 .kanban-card textarea {
   min-height: 1.5rem;
   line-height: 1.25;
-  resize: vertical;
+  resize: none; /* Убираем возможность изменения размера вручную */
+  overflow-y: hidden; /* Скрываем скроллбар по вертикали */
+  height: 1.5em; /* Начальная высота - одна строка */
+  transition: height 0.1s ease;
+}
+
+/* Разрешаем прокрутку при фокусе */
+.kanban-card textarea:focus {
+  overflow-y: auto;
 }
 
 /* Когда карточка перетаскивается */
@@ -183,12 +208,27 @@
 .kanban-board-title {
   border-bottom: 1px dashed transparent;
   transition: all 0.2s ease;
+  width: 100%;
+  display: block;
 }
 
 .kanban-board-title:hover,
 .kanban-board-title:focus {
   border-color: #60a5fa;
   outline: none;
+}
+
+/* Улучшение стилей для поля поиска */
+.kanban-board-search {
+  width: 100%;
+  transition: all 0.2s ease;
+  border: 1px solid #e5e7eb !important;
+}
+
+.kanban-board-search:focus {
+  border-color: #60a5fa !important;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2);
 }
 
 /* Убираем стили, которые больше не используются */
@@ -231,10 +271,12 @@
 .interactive-kanban-wrapper::after {
   content: "";
   display: block;
-  height: 1px;
+  height: 20px;
   width: 100%;
   pointer-events: none;
+  position: relative;
   clear: both;
+  margin-bottom: 10px;
 }
 
 /* Настройка фильтров */
@@ -253,6 +295,9 @@
 .ProseMirror [data-kanban-board="true"] + * {
   margin-top: 1em;
   pointer-events: auto;
+  cursor: text;
+  position: relative;
+  z-index: 1;
 }
 
 /* Увеличиваем отступы между карточками */

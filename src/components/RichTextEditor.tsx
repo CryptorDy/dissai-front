@@ -98,7 +98,7 @@ const BlockMenu = ({ isOpen, onClose, position, editor }: BlockMenuProps) => {
         break;
       case 'kanban':
         editor.chain().focus().insertContent({
-          type: 'interactiveKanban',
+          type: 'kanbanBoard',
           attrs: {}
         }).run();
         break;

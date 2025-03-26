@@ -70,22 +70,41 @@ const KanbanBoardComponent = (props) => {
 
   // Функция для сохранения состояния в TipTap
   const saveStateToTiptap = useCallback((newState) => {
-    if (!editor || !editor.isEditable || !updateAttributes) return;
+    if (!editor || !editor.isEditable || !updateAttributes) {
+      console.warn("Не удалось сохранить состояние: editor или updateAttributes недоступны");
+      return;
+    }
     
-    // Используем setTimeout с нулевой задержкой, чтобы вынести обновление 
-    // за пределы текущего цикла React и избежать использования flushSync
-    setTimeout(() => {
-      try {
-        if (editor && editor.isEditable && updateAttributes) {
-          updateAttributes({
-            boardState: newState,
-          });
-        }
-      } catch (error) {
-        console.error("Ошибка при обновлении атрибутов:", error);
-      }
-    }, 0);
+    // Проверяем и глубоко клонируем состояние для предотвращения мутаций
+    const safeState = JSON.parse(JSON.stringify(newState));
+    
+    console.log("Сохраняем в Tiptap:", {
+      boardTitle: safeState.boardTitle,
+      карточек: Object.keys(safeState.cards || {}).length,
+      колонок: (safeState.columns || []).length
+    });
+    
+    // Используем немедленное обновление атрибутов вместо setTimeout
+    try {
+      updateAttributes({
+        boardState: safeState,
+      });
+      console.log("Атрибуты успешно обновлены");
+    } catch (error) {
+      console.error("Ошибка при обновлении атрибутов:", error);
+    }
   }, [updateAttributes, editor]);
+
+  // Функция сохранения при потере фокуса - немедленное сохранение
+  const handleTitleBlur = () => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+    
+    console.log("Потеря фокуса заголовка, немедленное сохранение:", boardState?.boardTitle);
+    saveStateToTiptap(boardState);
+  };
 
   // Защита от проблем с рендерингом при нескольких экземплярах
   const instanceId = React.useMemo(() => `kanban-${generateId()}`, []);
@@ -346,11 +365,61 @@ const KanbanBoardComponent = (props) => {
     });
   };
 
+  // Изменение заголовка доски
+  const handleBoardTitleChange = (newTitle) => {
+    if (!boardState) return; // Защита от null/undefined
+    
+    // Проверяем, что newTitle не undefined и не null
+    const title = newTitle || "Канбан-доска";
+    
+    console.log("Устанавливаем новое название:", title);
+    
+    // Немедленно обновляем состояние и сохраняем его
+    const updatedState = {
+      ...boardState,
+      boardTitle: title
+    };
+    
+    // Немедленно устанавливаем новое состояние
+    setBoardState(updatedState);
+    
+    // Отменяем ранее запланированное сохранение
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    
+    // Сохраняем изменения немедленно
+    saveStateToTiptap(updatedState);
+  };
+  
+  // Референс для таймаута сохранения
+  const saveTimeoutRef = React.useRef(null);
+  
+  // Очистка таймаута при размонтировании
+  React.useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
+
   // Фильтрация карточек
   const filteredCards = (columnId, cardIds) => {
     if (!boardState || !boardState.cards) return [];
     
-    return (cardIds || [])
+    // Проверяем, что cardIds существует и это массив
+    const ids = Array.isArray(cardIds) ? cardIds : [];
+    
+    // Отладочный вывод для проверки фильтрации
+    console.log("Фильтрация:", { 
+      текст: filterText, 
+      приоритет: filterPriority, 
+      ids: ids.length,
+      колонка: columnId 
+    });
+    
+    return ids
       .map(cardId => boardState.cards[cardId])
       .filter(card => {
         if (!card) return false;
@@ -387,24 +456,6 @@ const KanbanBoardComponent = (props) => {
   // Безопасно вычисляем статистику
   const stats = calculateStats();
 
-  // Изменение заголовка доски
-  const handleBoardTitleChange = (newTitle) => {
-    if (!boardState) return; // Защита от null/undefined
-    
-    setBoardState(prevState => {
-      if (!prevState) return prevState;
-      
-      const updatedState = {
-        ...prevState,
-        boardTitle: newTitle
-      };
-      
-      saveStateToTiptap(updatedState);
-      
-      return updatedState;
-    });
-  };
-
   // Рендеринг компонента
   return (
     <NodeViewWrapper 
@@ -413,9 +464,16 @@ const KanbanBoardComponent = (props) => {
       data-kanban-board="true"
       onPointerDown={(e) => {
         const rect = e.currentTarget.getBoundingClientRect();
-        // Если клик произошел вне визуальных границ компонента, не блокируем
+        
+        // Если клик произошел за нижней границей канбан-доски,
+        // пропускаем его для создания нового параграфа
+        if (e.clientY > rect.bottom) {
+          // Не останавливаем распространение, позволяем редактору обработать клик
+          return;
+        }
+        
+        // Если клик произошел вне визуальных границ компонента слева/справа/сверху, не блокируем
         if (
-          e.clientY > rect.bottom ||
           e.clientY < rect.top ||
           e.clientX > rect.right ||
           e.clientX < rect.left
@@ -423,6 +481,7 @@ const KanbanBoardComponent = (props) => {
           return;
         }
         
+        // Блокируем клик внутри канбан-доски 
         e.stopPropagation();
       }}
     >
@@ -432,10 +491,24 @@ const KanbanBoardComponent = (props) => {
         className="kanban-board-react-content not-prose"
         style={{ pointerEvents: 'auto', zIndex: 1 }}
         onClick={(e) => {
+          // Проверяем, является ли клик нижней частью компонента
+          const rect = e.currentTarget.getBoundingClientRect();
+          if (e.clientY > rect.bottom - 20) {
+            // Не предотвращаем события для нижней части
+            return;
+          }
+          
           e.stopPropagation();
           e.preventDefault();
         }}
         onMouseDown={(e) => {
+          // Проверяем, является ли клик нижней частью компонента
+          const rect = e.currentTarget.getBoundingClientRect();
+          if (e.clientY > rect.bottom - 20) {
+            // Не предотвращаем события для нижней части
+            return;
+          }
+          
           e.stopPropagation();
           e.preventDefault();
         }}
@@ -454,24 +527,30 @@ const KanbanBoardComponent = (props) => {
               type="text"
               value={boardState?.boardTitle || "Канбан-доска"}
               onChange={(e) => {
+                e.preventDefault();
                 e.stopPropagation();
-                handleBoardTitleChange(e.target.value);
+                const newTitle = e.target.value;
+                console.log("Изменение названия:", newTitle);
+                handleBoardTitleChange(newTitle);
               }}
-              onInput={(e) => {
-                e.stopPropagation();
-                handleBoardTitleChange(e.target.value);
-              }}
-              onKeyDown={(e) => e.stopPropagation()}
-              onFocus={(e) => e.target.select()}
               onClick={(e) => {
                 e.stopPropagation();
-                e.preventDefault();
               }}
               onMouseDown={(e) => {
                 e.stopPropagation();
-                e.preventDefault();
               }}
-              className="kanban-board-title bg-transparent border-none focus:ring-0 p-0 w-full text-lg font-medium text-gray-900 dark:text-white"
+              onKeyDown={(e) => {
+                e.stopPropagation();
+                // Сохраняем при нажатии Enter
+                if (e.key === 'Enter') {
+                  console.log("Сохранение названия при Enter");
+                  e.target.blur();
+                  // Принудительно сохраняем текущее состояние
+                  saveStateToTiptap(boardState);
+                }
+              }}
+              onBlur={handleTitleBlur}
+              className="kanban-board-title bg-transparent p-0 w-full text-lg font-medium text-gray-900 dark:text-white"
               placeholder="Название доски"
             />
           </div>
@@ -483,24 +562,25 @@ const KanbanBoardComponent = (props) => {
                 placeholder="Поиск задач..."
                 value={filterText}
                 onChange={(e) => {
+                  e.preventDefault();
                   e.stopPropagation();
+                  console.log("Поиск:", e.target.value);
                   setFilterText(e.target.value);
                 }}
-                onInput={(e) => {
-                  e.stopPropagation();
-                  setFilterText(e.target.value);
-                }}
-                onFocus={(e) => e.stopPropagation()}
-                onKeyDown={(e) => e.stopPropagation()}
                 onClick={(e) => {
                   e.stopPropagation();
-                  e.preventDefault();
                 }}
                 onMouseDown={(e) => {
                   e.stopPropagation();
-                  e.preventDefault();
                 }}
-                className="kanban-board-search text-sm rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-1 px-3 text-gray-900 dark:text-white w-full sm:w-48"
+                onKeyDown={(e) => {
+                  e.stopPropagation();
+                  if (e.key === 'Escape') {
+                    setFilterText('');
+                    e.target.blur();
+                  }
+                }}
+                className="kanban-board-search text-sm rounded-md bg-white dark:bg-gray-800 py-1 px-3 text-gray-900 dark:text-white w-full sm:w-48"
               />
               {filterText && (
                 <button

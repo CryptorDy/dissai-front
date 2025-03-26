@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 
 // Компонент карточки с поддержкой перетаскивания
 const DraggableCard = ({
@@ -11,6 +11,24 @@ const DraggableCard = ({
   handleDragStart,
   isLastCard = false
 }) => {
+  // Референс для текстового поля
+  const textareaRef = useRef(null);
+  
+  // Функция для автоматического изменения размера текстового поля
+  const autoResizeTextarea = () => {
+    if (textareaRef.current) {
+      // Сначала сбрасываем высоту до минимальной
+      textareaRef.current.style.height = '1.5em';
+      // Затем устанавливаем высоту на основе содержимого
+      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+    }
+  };
+  
+  // Изменение размера при изменении содержимого
+  useEffect(() => {
+    autoResizeTextarea();
+  }, [card.description]);
+  
   // Определяем цвет полоски в зависимости от приоритета и колонки
   let borderLeftColor = '#e5e7eb'; // Цвет по умолчанию - серый
   // Только для колонок "Планируется" и "Завершено" показываем цветные полоски
@@ -90,8 +108,12 @@ const DraggableCard = ({
           </button>
         </div>
         <textarea
+          ref={textareaRef}
           value={card.description}
-          onChange={(e) => handleCardDescriptionChange(card.id, e.target.value)}
+          onChange={(e) => {
+            handleCardDescriptionChange(card.id, e.target.value);
+            // Автоматическое изменение размера уже происходит в эффекте
+          }}
           className="text-xs text-gray-500 dark:text-gray-400 w-full bg-transparent border-none p-0 focus:ring-0 resize-none"
           rows={1}
           onKeyDown={e => e.stopPropagation()}
