@@ -56,6 +56,26 @@ export const InteractiveKanbanNode = Node.create<{
   // Добавление плагинов
   addProseMirrorPlugins() {
     const plugins: Plugin[] = [];
+    
+    // Добавление плагина для правильного взаимодействия с редактором
+    plugins.push(
+      new Plugin({
+        key: new PluginKey('interactiveKanbanHandling'),
+        props: {
+          handleDOMEvents: {
+            mousedown: (view, event) => {
+              // Если клик происходит вне узла kanban - не мешаем стандартному поведению
+              const target = event.target as HTMLElement;
+              if (!target.closest('[data-kanban-board="true"]')) {
+                return false;
+              }
+              return false;
+            }
+          }
+        }
+      })
+    );
+    
     return plugins;
   },
 

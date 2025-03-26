@@ -7,187 +7,12 @@ import { NodeViewWrapper } from '@tiptap/react';
 // Стили компонента
 import './KanbanBoardComponent.css';
 
+// Импортируем выделенные компоненты
+import DraggableCard from './DraggableCard';
+import DroppableColumn from './DroppableColumn';
+
 // Вспомогательная функция для генерации ID
 const generateId = () => `id-${Math.random().toString(36).substr(2, 9)}`;
-
-// Компонент карточки с поддержкой перетаскивания
-const DraggableCard = ({ card, columnId, handleDeleteCard, handleCardTitleChange, handleCardDescriptionChange, handleCardPriorityChange, handleDragStart }) => {
-  // Определяем цвет полоски в зависимости от приоритета и колонки
-  let borderLeftColor = '#e5e7eb'; // Цвет по умолчанию - серый
-  // Только для колонок "Планируется" и "Завершено" показываем цветные полоски
-  if (columnId !== 'col-2') { // Не для колонки "В процессе" 
-    if (card.priority === 'high') {
-      borderLeftColor = '#f87171'; // Красный для высокого приоритета
-    } else if (card.priority === 'medium') {
-      borderLeftColor = '#fbbf24'; // Желтый для среднего приоритета
-    } else if (card.priority === 'low') {
-      borderLeftColor = '#60a5fa'; // Синий для низкого приоритета
-    }
-  }
-
-  // Определяем классы для фона карточки
-  let cardBgClass = 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-700';
-  
-  // Применяем цветное выделение только для колонок "Планируется" и "Завершено"
-  if (columnId !== 'col-2') {
-    if (card.priority === 'high') {
-      cardBgClass = 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20';
-    } else if (card.priority === 'medium') {
-      cardBgClass = 'border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20';
-    } else if (card.priority === 'low') {
-      cardBgClass = 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20';
-    }
-  }
-
-  return (
-    <div 
-      className="card-wrapper" 
-      style={{ marginBottom: '15px' }}
-      draggable
-      onDragStart={(e) => {
-        e.stopPropagation();
-        handleDragStart(card.id, columnId, e);
-      }}
-    >
-      <div
-        className={`kanban-card p-2 rounded-md shadow-sm hover:shadow-md relative group border ${cardBgClass}`}
-        onMouseDown={e => {
-          e.stopPropagation();
-          e.preventDefault();
-        }}
-        onClick={e => {
-          e.stopPropagation();
-          e.preventDefault();
-        }}
-        style={{ 
-          borderLeftWidth: '4px',
-          borderLeftColor: borderLeftColor,
-          cursor: 'grab'
-        }}
-      >
-        <div className="flex justify-between items-start">
-          <input
-            type="text"
-            value={card.title}
-            onChange={(e) => handleCardTitleChange(card.id, e.target.value)}
-            className="text-sm font-medium text-gray-800 dark:text-gray-100 mb-1 w-full bg-transparent border-none p-0 focus:ring-0"
-            onKeyDown={e => e.stopPropagation()}
-            onMouseDown={e => e.stopPropagation()}
-            placeholder="Введите название задачи"
-          />
-          <button
-            className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-            onClick={() => handleDeleteCard(columnId, card.id)}
-            onMouseDown={e => {
-              e.stopPropagation();
-              e.preventDefault();
-            }}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        <textarea
-          value={card.description}
-          onChange={(e) => handleCardDescriptionChange(card.id, e.target.value)}
-          className="text-xs text-gray-500 dark:text-gray-400 w-full bg-transparent border-none p-0 focus:ring-0 resize-none"
-          rows={1}
-          onKeyDown={e => e.stopPropagation()}
-          onMouseDown={e => e.stopPropagation()}
-          placeholder="Введите описание задачи"
-        />
-        
-        <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100 dark:border-gray-600">
-          <select
-            value={card.priority || 'none'}
-            onChange={(e) => handleCardPriorityChange(card.id, e.target.value)}
-            className="text-xs bg-transparent border-none focus:ring-0 p-0 pr-4 text-gray-500 dark:text-gray-400"
-            onMouseDown={e => e.stopPropagation()}
-          >
-            <option value="none">Без приоритета</option>
-            <option value="low">Низкий</option>
-            <option value="medium">Средний</option>
-            <option value="high">Высокий</option>
-          </select>
-          
-          {card.priority && (
-            <span className={`text-xs px-2 py-0.5 rounded-full ${
-              card.priority === 'high' 
-                ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
-                : card.priority === 'medium'
-                  ? 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400'
-                  : 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
-            }`}>
-              {card.priority === 'low' ? 'Низкий' : card.priority === 'medium' ? 'Средний' : 'Высокий'}
-            </span>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Компонент колонки с поддержкой drop
-const DroppableColumn = ({ column, cards, handleColumnTitleChange, handleAddCard, handleDeleteCard, handleCardTitleChange, handleCardDescriptionChange, handleCardPriorityChange, handleDragStart, handleDrop, isFirstColumn }) => {
-  return (
-    <div
-      className="kanban-column bg-gray-50 dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700"
-      onDragOver={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-      }}
-      onDrop={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        handleDrop(column.id, e);
-      }}
-    >
-      <div className="kanban-column-header flex items-center justify-between mb-3">
-        <input
-          type="text"
-          value={column.title}
-          onChange={(e) => handleColumnTitleChange(column.id, e.target.value)}
-          className="text-sm font-medium text-gray-700 dark:text-gray-300 bg-transparent border-none p-0 focus:ring-0 w-full"
-          onMouseDown={e => e.stopPropagation()}
-          onKeyDown={e => e.stopPropagation()}
-        />
-        <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded-full">
-          {cards.length}
-        </span>
-      </div>
-
-      <div className="min-h-[100px]">
-        {cards.map((card, index) => (
-          <DraggableCard
-            key={card.id}
-            card={card}
-            columnId={column.id}
-            handleDeleteCard={handleDeleteCard}
-            handleCardTitleChange={handleCardTitleChange}
-            handleCardDescriptionChange={handleCardDescriptionChange}
-            handleCardPriorityChange={handleCardPriorityChange}
-            handleDragStart={handleDragStart}
-          />
-        ))}
-      </div>
-
-      {/* Кнопка добавления только в первой колонке (Планируется) */}
-      {isFirstColumn && (
-        <button
-          className="mt-4 text-sm text-white bg-blue-500 hover:bg-blue-600 py-1 px-3 rounded-md w-full transition-colors"
-          onClick={() => handleAddCard(column.id)}
-          onMouseDown={e => {
-            e.stopPropagation();
-            e.preventDefault();
-          }}
-        >
-          + Добавить задачу
-        </button>
-      )}
-    </div>
-  );
-};
 
 const KanbanBoardComponent = (props) => {
   const { node, updateAttributes, editor } = props;
@@ -197,7 +22,7 @@ const KanbanBoardComponent = (props) => {
   const [draggedFromColumnId, setDraggedFromColumnId] = useState(null);
 
   // Инициализируем состояние из атрибутов ноды Tiptap
-  const initialBoardState = node.attrs.boardState || {
+  const defaultBoardState = {
     columns: [
       { id: 'col-1', title: 'Планируется', cardIds: ['card-1', 'card-2'] },
       { id: 'col-2', title: 'В процессе', cardIds: ['card-3'] },
@@ -212,17 +37,79 @@ const KanbanBoardComponent = (props) => {
     boardTitle: 'Канбан-доска проекта',
   };
 
+  // Проверка существования и корректности данных из ноды
+  const initialBoardState = (() => {
+    try {
+      // Проверяем, что node и node.attrs существуют
+      if (!node || !node.attrs || !node.attrs.boardState) {
+        return defaultBoardState;
+      }
+      
+      // Проверяем, что структура данных полная
+      const data = node.attrs.boardState;
+      const hasRequiredProperties = 
+        data.columns && 
+        data.cards && 
+        data.columnOrder && 
+        typeof data.boardTitle === 'string';
+        
+      if (!hasRequiredProperties) {
+        return defaultBoardState;
+      }
+      
+      return data;
+    } catch (error) {
+      console.error("Ошибка при инициализации состояния канбан-доски:", error);
+      return defaultBoardState;
+    }
+  })();
+
   const [boardState, setBoardState] = useState(initialBoardState);
   const [filterText, setFilterText] = useState('');
   const [filterPriority, setFilterPriority] = useState(null);
 
   // Функция для сохранения состояния в TipTap
   const saveStateToTiptap = useCallback((newState) => {
-    if (!editor.isEditable) return;
-    updateAttributes({
-      boardState: newState,
-    });
-  }, [updateAttributes, editor.isEditable]);
+    if (!editor || !editor.isEditable || !updateAttributes) return;
+    
+    // Используем setTimeout с нулевой задержкой, чтобы вынести обновление 
+    // за пределы текущего цикла React и избежать использования flushSync
+    setTimeout(() => {
+      try {
+        if (editor && editor.isEditable && updateAttributes) {
+          updateAttributes({
+            boardState: newState,
+          });
+        }
+      } catch (error) {
+        console.error("Ошибка при обновлении атрибутов:", error);
+      }
+    }, 0);
+  }, [updateAttributes, editor]);
+
+  // Защита от проблем с рендерингом при нескольких экземплярах
+  const instanceId = React.useMemo(() => `kanban-${generateId()}`, []);
+  
+  // Используем useLayoutEffect для предотвращения flushSync warning
+  React.useLayoutEffect(() => {
+    if (!node?.attrs?.boardState) return;
+    
+    try {
+      // Мемоизируем данные для предотвращения лишних ре-рендеров
+      const data = JSON.parse(JSON.stringify(node.attrs.boardState));
+      if (data && data.columns && data.cards && data.columnOrder) {
+        setBoardState(prevState => {
+          // Сравниваем, действительно ли данные изменились
+          if (JSON.stringify(prevState) === JSON.stringify(data)) {
+            return prevState;
+          }
+          return data;
+        });
+      }
+    } catch (error) {
+      console.error(`[${instanceId}] Ошибка при обработке данных:`, error);
+    }
+  }, [node?.attrs?.boardState, instanceId]);
 
   // Обработчики событий
 
@@ -254,6 +141,8 @@ const KanbanBoardComponent = (props) => {
 
   // Изменение заголовка карточки
   const handleCardTitleChange = (cardId, newTitle) => {
+    if (!boardState || !boardState.cards || !boardState.cards[cardId]) return;
+    
     const newState = {
       ...boardState,
       cards: {
@@ -264,56 +153,102 @@ const KanbanBoardComponent = (props) => {
         },
       },
     };
-    setBoardState(newState);
-    saveStateToTiptap(newState);
+    
+    // Сначала обновляем локальное состояние, затем отправляем в Tiptap
+    setBoardState(prevState => {
+      // Дополнительная проверка, чтобы убедиться, что состояние не изменилось с момента вызова
+      if (!prevState || !prevState.cards || !prevState.cards[cardId]) return prevState;
+      
+      const updatedState = {
+        ...prevState,
+        cards: {
+          ...prevState.cards,
+          [cardId]: {
+            ...prevState.cards[cardId],
+            title: newTitle,
+          },
+        },
+      };
+      
+      // Асинхронно сохраняем в Tiptap
+      saveStateToTiptap(updatedState);
+      
+      return updatedState;
+    });
   };
 
   // Изменение описания карточки
   const handleCardDescriptionChange = (cardId, newDescription) => {
-    const newState = {
-      ...boardState,
-      cards: {
-        ...boardState.cards,
-        [cardId]: {
-          ...boardState.cards[cardId],
-          description: newDescription,
+    if (!boardState || !boardState.cards || !boardState.cards[cardId]) return;
+    
+    setBoardState(prevState => {
+      if (!prevState || !prevState.cards || !prevState.cards[cardId]) return prevState;
+      
+      const updatedState = {
+        ...prevState,
+        cards: {
+          ...prevState.cards,
+          [cardId]: {
+            ...prevState.cards[cardId],
+            description: newDescription,
+          },
         },
-      },
-    };
-    setBoardState(newState);
-    saveStateToTiptap(newState);
+      };
+      
+      saveStateToTiptap(updatedState);
+      
+      return updatedState;
+    });
   };
 
   // Изменение приоритета карточки
   const handleCardPriorityChange = (cardId, newPriority) => {
-    const newState = {
-      ...boardState,
-      cards: {
-        ...boardState.cards,
-        [cardId]: {
-          ...boardState.cards[cardId],
-          priority: newPriority === 'none' ? undefined : newPriority,
+    if (!boardState || !boardState.cards || !boardState.cards[cardId]) return;
+    
+    setBoardState(prevState => {
+      if (!prevState || !prevState.cards || !prevState.cards[cardId]) return prevState;
+      
+      const updatedState = {
+        ...prevState,
+        cards: {
+          ...prevState.cards,
+          [cardId]: {
+            ...prevState.cards[cardId],
+            priority: newPriority === 'none' ? undefined : newPriority,
+          },
         },
-      },
-    };
-    setBoardState(newState);
-    saveStateToTiptap(newState);
+      };
+      
+      saveStateToTiptap(updatedState);
+      
+      return updatedState;
+    });
   };
 
   // Изменение заголовка колонки
   const handleColumnTitleChange = (columnId, newTitle) => {
-    const newState = {
-      ...boardState,
-      columns: boardState.columns.map(col => 
-        col.id === columnId ? { ...col, title: newTitle } : col
-      )
-    };
-    setBoardState(newState);
-    saveStateToTiptap(newState);
+    if (!boardState || !boardState.columns) return;
+    
+    setBoardState(prevState => {
+      if (!prevState || !prevState.columns) return prevState;
+      
+      const updatedState = {
+        ...prevState,
+        columns: prevState.columns.map(col => 
+          col.id === columnId ? { ...col, title: newTitle } : col
+        )
+      };
+      
+      saveStateToTiptap(updatedState);
+      
+      return updatedState;
+    });
   };
 
   // Добавление новой карточки
   const handleAddCard = (columnId) => {
+    if (!boardState || !boardState.columns || !boardState.cards) return;
+    
     const newCardId = `card-${generateId()}`;
     const newCard = {
       id: newCardId,
@@ -321,88 +256,109 @@ const KanbanBoardComponent = (props) => {
       description: 'Описание задачи'
     };
     
-    const newState = {
-      ...boardState,
-      cards: {
-        ...boardState.cards,
-        [newCardId]: newCard,
-      },
-      columns: boardState.columns.map(col =>
-        col.id === columnId
-          ? { ...col, cardIds: [...col.cardIds, newCardId] }
-          : col
-      ),
-    };
-    
-    setBoardState(newState);
-    saveStateToTiptap(newState);
+    setBoardState(prevState => {
+      if (!prevState || !prevState.columns || !prevState.cards) return prevState;
+      
+      const updatedState = {
+        ...prevState,
+        cards: {
+          ...prevState.cards,
+          [newCardId]: newCard,
+        },
+        columns: prevState.columns.map(col =>
+          col.id === columnId
+            ? { ...col, cardIds: [...(col.cardIds || []), newCardId] }
+            : col
+        ),
+      };
+      
+      saveStateToTiptap(updatedState);
+      
+      return updatedState;
+    });
   };
 
   // Удаление карточки
   const handleDeleteCard = (columnId, cardId) => {
-    const newColumns = boardState.columns.map(col =>
-      col.id === columnId
-        ? { ...col, cardIds: col.cardIds.filter(id => id !== cardId) }
-        : col
-    );
+    if (!boardState || !boardState.columns || !boardState.cards) return;
     
-    const newCards = { ...boardState.cards };
-    delete newCards[cardId];
-    
-    const newState = {
-      ...boardState,
-      cards: newCards,
-      columns: newColumns,
-    };
-    
-    setBoardState(newState);
-    saveStateToTiptap(newState);
+    setBoardState(prevState => {
+      if (!prevState || !prevState.columns || !prevState.cards) return prevState;
+      
+      const newColumns = prevState.columns.map(col =>
+        col.id === columnId
+          ? { ...col, cardIds: (col.cardIds || []).filter(id => id !== cardId) }
+          : col
+      );
+      
+      const newCards = { ...prevState.cards };
+      delete newCards[cardId];
+      
+      const updatedState = {
+        ...prevState,
+        cards: newCards,
+        columns: newColumns,
+      };
+      
+      saveStateToTiptap(updatedState);
+      
+      return updatedState;
+    });
   };
 
   // Перемещение карточки между колонками
   const moveCard = (cardId, sourceColumnId, destinationColumnId) => {
-    // Получаем исходную и целевую колонки
-    const sourceColumn = boardState.columns.find(col => col.id === sourceColumnId);
-    const destinationColumn = boardState.columns.find(col => col.id === destinationColumnId);
+    if (!boardState || !boardState.columns || !boardState.cards) return;
     
-    if (!sourceColumn || !destinationColumn) return;
+    setBoardState(prevState => {
+      if (!prevState || !prevState.columns || !prevState.cards) return prevState;
+      
+      // Получаем исходную и целевую колонки
+      const sourceColumn = prevState.columns.find(col => col.id === sourceColumnId);
+      const destinationColumn = prevState.columns.find(col => col.id === destinationColumnId);
+      
+      if (!sourceColumn || !destinationColumn) return prevState;
 
-    // Создаем новые массивы ID карточек для обеих колонок
-    const sourceCardIds = [...sourceColumn.cardIds].filter(id => id !== cardId);
-    const destinationCardIds = [...destinationColumn.cardIds];
-    
-    // Добавляем ID карточки в целевую колонку
-    destinationCardIds.push(cardId);
-    
-    // Обновляем состояние
-    const newState = {
-      ...boardState,
-      columns: boardState.columns.map(col => {
-        if (col.id === sourceColumnId) {
-          return { ...col, cardIds: sourceCardIds };
-        }
-        if (col.id === destinationColumnId) {
-          return { ...col, cardIds: destinationCardIds };
-        }
-        return col;
-      }),
-    };
-    
-    setBoardState(newState);
-    saveStateToTiptap(newState);
+      // Создаем новые массивы ID карточек для обеих колонок
+      const sourceCardIds = [...(sourceColumn.cardIds || [])].filter(id => id !== cardId);
+      const destinationCardIds = [...(destinationColumn.cardIds || [])];
+      
+      // Добавляем ID карточки в целевую колонку
+      destinationCardIds.push(cardId);
+      
+      // Обновляем состояние
+      const updatedState = {
+        ...prevState,
+        columns: prevState.columns.map(col => {
+          if (col.id === sourceColumnId) {
+            return { ...col, cardIds: sourceCardIds };
+          }
+          if (col.id === destinationColumnId) {
+            return { ...col, cardIds: destinationCardIds };
+          }
+          return col;
+        }),
+      };
+      
+      saveStateToTiptap(updatedState);
+      
+      return updatedState;
+    });
   };
 
   // Фильтрация карточек
   const filteredCards = (columnId, cardIds) => {
-    return cardIds
+    if (!boardState || !boardState.cards) return [];
+    
+    return (cardIds || [])
       .map(cardId => boardState.cards[cardId])
       .filter(card => {
         if (!card) return false;
         
         // Фильтр по тексту
         const textMatch = !filterText || 
-          card.title.toLowerCase().includes(filterText.toLowerCase()) || 
-          card.description.toLowerCase().includes(filterText.toLowerCase());
+          card.title?.toLowerCase().includes(filterText.toLowerCase()) || 
+          card.description?.toLowerCase().includes(filterText.toLowerCase());
         
         // Фильтр по приоритету
         const priorityMatch = !filterPriority || card.priority === filterPriority;
@@ -413,6 +369,11 @@ const KanbanBoardComponent = (props) => {
 
   // Статистика задач
   const calculateStats = () => {
+    // Проверяем существование boardState и его свойств
+    if (!boardState || !boardState.cards || !boardState.columns) {
+      return { total: 0, completed: 0, inProgress: 0, planned: 0, completionPercentage: 0 };
+    }
+    
     const total = Object.keys(boardState.cards).length;
     const completed = boardState.columns.find(col => col.id === 'col-3')?.cardIds.length || 0;
     const inProgress = boardState.columns.find(col => col.id === 'col-2')?.cardIds.length || 0;
@@ -423,54 +384,75 @@ const KanbanBoardComponent = (props) => {
     return { total, completed, inProgress, planned, completionPercentage };
   };
 
+  // Безопасно вычисляем статистику
   const stats = calculateStats();
 
   // Изменение заголовка доски
   const handleBoardTitleChange = (newTitle) => {
-    const newState = {
-      ...boardState,
-      boardTitle: newTitle
-    };
-    setBoardState(newState);
-    saveStateToTiptap(newState);
+    if (!boardState) return; // Защита от null/undefined
+    
+    setBoardState(prevState => {
+      if (!prevState) return prevState;
+      
+      const updatedState = {
+        ...prevState,
+        boardTitle: newTitle
+      };
+      
+      saveStateToTiptap(updatedState);
+      
+      return updatedState;
+    });
   };
 
   // Рендеринг компонента
   return (
     <NodeViewWrapper 
-      className="interactive-kanban-wrapper p-1 bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg"
+      className="interactive-kanban-wrapper relative p-1 bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg mb-4"
       contentEditable={false}
+      data-kanban-board="true"
+      onPointerDown={(e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        // Если клик произошел вне визуальных границ компонента, не блокируем
+        if (
+          e.clientY > rect.bottom ||
+          e.clientY < rect.top ||
+          e.clientX > rect.right ||
+          e.clientX < rect.left
+        ) {
+          return;
+        }
+        
+        e.stopPropagation();
+      }}
     >
       {/* Добавляем обертку с предотвращением событий */}
       <div 
         contentEditable={false}
         className="kanban-board-react-content not-prose"
+        style={{ pointerEvents: 'auto', zIndex: 1 }}
         onClick={(e) => {
           e.stopPropagation();
           e.preventDefault();
-          return false;
         }}
         onMouseDown={(e) => {
           e.stopPropagation();
           e.preventDefault();
-          return false;
         }}
         onMouseUp={(e) => {
           e.stopPropagation();
           e.preventDefault();
-          return false;
         }}
         onDoubleClick={(e) => {
           e.stopPropagation();
           e.preventDefault();
-          return false;
         }}
       >
         <div className="p-4 flex flex-col md:flex-row justify-between items-start md:items-center">
           <div className="text-lg font-medium text-gray-900 dark:text-white mb-2 md:mb-0 w-1/3">
             <input
               type="text"
-              value={boardState.boardTitle}
+              value={boardState?.boardTitle || "Канбан-доска"}
               onChange={(e) => {
                 e.stopPropagation();
                 handleBoardTitleChange(e.target.value);
@@ -584,8 +566,8 @@ const KanbanBoardComponent = (props) => {
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4">
-          {boardState.columnOrder?.map((columnId, index) => {
-            const column = boardState.columns.find(c => c.id === columnId);
+          {boardState?.columnOrder?.map((columnId, index) => {
+            const column = boardState?.columns?.find(c => c.id === columnId);
             if (!column) return null;
 
             // Фильтрованные карточки
@@ -609,7 +591,11 @@ const KanbanBoardComponent = (props) => {
                 isFirstColumn={isFirstColumn}
               />
             );
-          })}
+          }) || (
+            <div className="col-span-3 text-center p-4 text-gray-500">
+              Канбан-доска загружается...
+            </div>
+          )}
         </div>
       </div>
     </NodeViewWrapper>

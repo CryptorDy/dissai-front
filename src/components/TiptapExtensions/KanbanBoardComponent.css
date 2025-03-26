@@ -2,9 +2,11 @@
 
 /* Обертка компонента */
 .interactive-kanban-wrapper {
-  margin: 1rem 0;
+  position: relative;
   pointer-events: auto;
   user-select: none;
+  margin-bottom: 1em;
+  box-sizing: border-box;
   border-radius: 0.5rem;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
   transition: all 0.2s ease;
@@ -24,6 +26,7 @@
   -moz-user-select: none;
   -ms-user-select: none;
   overflow: hidden;
+  z-index: 1;
 }
 
 /* Запрет редактирования внутри компонента через ProseMirror */
@@ -65,15 +68,15 @@
 
 /* Карточка в канбане */
 .kanban-card {
-  transition: all 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
   cursor: grab;
   position: relative;
   overflow: hidden;
 }
 
 .kanban-card:hover {
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .kanban-card:active {
@@ -217,5 +220,51 @@
 
 /* Стили для коррекции отступов */
 .card-wrapper {
+  margin-bottom: 15px !important;
+}
+
+.kanban-column .card-wrapper:not(:last-child) {
   margin-bottom: 8px !important;
-} 
+}
+
+/* Избегаем перекрытия области после компонента */
+.interactive-kanban-wrapper::after {
+  content: "";
+  display: block;
+  height: 1px;
+  width: 100%;
+  pointer-events: none;
+  clear: both;
+}
+
+/* Настройка фильтров */
+.filters-container {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+/* Решение проблемы с редактированием */
+[contenteditable=true] .interactive-kanban-wrapper,
+[contenteditable=true] .kanban-board-react-content {
+  pointer-events: auto;
+}
+
+.ProseMirror [data-kanban-board="true"] + * {
+  margin-top: 1em;
+  pointer-events: auto;
+}
+
+/* Увеличиваем отступы между карточками */
+.kanban-cards-container > * {
+  margin-bottom: 20px !important;
+}
+
+.kanban-cards-container > *:last-child {
+  margin-bottom: 0 !important;
+}
+
+/* Последняя карточка в колонке */
+.kanban-column .card-wrapper:last-child {
+  margin-bottom: 5px !important;
+}
