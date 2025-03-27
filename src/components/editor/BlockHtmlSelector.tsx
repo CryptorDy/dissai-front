@@ -59,10 +59,41 @@ type Block = {
   };
 };
 
-const insertHtml = (editor: any, html: string) => {
-  // Упрощаем HTML, удаляя лишние переносы строк для лучшей обработки
+// Функция для закрытия селектора блоков
+const closeBlockSelector = () => {
+  // Скрываем селектор блоков, если он открыт
+  const selector = document.querySelector('.block-selector');
+  if (selector) {
+    selector.classList.add('hidden');
+  }
+};
+
+const insertHtml = (editor: any, html: string, blockId?: string) => {
   try {
-    const cleanHtml = html
+    // Проверяем на канбан-доску по идентификатору блока, а не только по HTML-содержимому
+    if (blockId === 'kanban-board' || (html && (html.includes('interactive-kanban') || html.includes('kanban-board')))) {
+      console.log('Обнаружена канбан-доска, используем специальную вставку');
+      
+      try {
+        // Вставляем канбан-доску как специальный узел
+        if (editor.can().chain().focus().insertContent({ type: 'kanbanBoard', attrs: {} }).run()) {
+          editor.chain().focus().insertContent({ type: 'kanbanBoard', attrs: {} }).run();
+          
+          // Закрываем селектор блоков
+          closeBlockSelector();
+          console.log('Канбан-доска успешно вставлена');
+          return true;
+        } else {
+          console.error('Редактор не может вставить канбан-доску');
+        }
+      } catch (error) {
+        console.error('Ошибка при вставке канбан-доски:', error);
+      }
+      return false;
+    }
+    
+    // Очищаем HTML от возможных проблемных атрибутов
+    let cleanHtml = html
       .replace(/\n\s+/g, ' ')
       .replace(/\s{2,}/g, ' ')
       .trim();
@@ -550,10 +581,10 @@ export function BlockSelector({ editor, isOpen, onClose, position }: BlockSelect
   }, [isOpen]);
 
   // Функция для вставки блока HTML
-  const insertBlock = (blockHtml: string) => {
-    insertHtml(editor, blockHtml);
+  const insertBlock = (blockHtml: string, blockId?: string) => {
+    insertHtml(editor, blockHtml, blockId);
     setTimeout(() => {
-    onClose();
+      onClose();
     }, 0);
   };
 
@@ -631,9 +662,13 @@ export function BlockSelector({ editor, isOpen, onClose, position }: BlockSelect
                   if (typeof block.action === 'function') {
                     // Для стандартных блоков TipTap используем прямой вызов action
                     insertBuiltInBlock(block.action);
+                  } else if (block.insert) {
+                    // Для специальных типов блоков (например, канбан-доски)
+                    editor.chain().focus().insertContent(block.insert).run();
+                    onClose();
                   } else {
                     // Для HTML-блоков используем insertBlock, который использует insertStyledHtmlBlock
-                    insertBlock(block.html || '');
+                    insertBlock(block.html || '', block.id);
                   }
                 }}
                 className="flex flex-col items-start p-2 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left"

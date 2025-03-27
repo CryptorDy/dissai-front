@@ -56,51 +56,28 @@ const BlockMenu = ({ isOpen, onClose, position, editor }: BlockMenuProps) => {
   if (!isOpen) return null;
 
   const handleAddBlock = (type: string) => {
-    // Добавляем выбранный тип блока
-    switch(type) {
-      case 'heading1':
-        editor.chain().focus().toggleHeading({ level: 1 }).run();
-        break;
-      case 'heading2':
-        editor.chain().focus().toggleHeading({ level: 2 }).run();
-        break;
-      case 'heading3':
-        editor.chain().focus().toggleHeading({ level: 3 }).run();
-        break;
-      case 'bulletList':
-        editor.chain().focus().toggleBulletList().run();
-        break;
-      case 'orderedList':
-        editor.chain().focus().toggleOrderedList().run();
-        break;
-      case 'taskList':
-        editor.chain().focus().toggleTaskList().run();
-        break;
-      case 'blockquote':
-        editor.chain().focus().toggleBlockquote().run();
-        break;
-      case 'codeBlock':
-        editor.chain().focus().toggleCodeBlock().run();
-        break;
-      case 'horizontalRule':
-        editor.chain().focus().setHorizontalRule().run();
-        break;
-      case 'table':
-        editor.chain().focus()
-          .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
-          .run();
-        break;
+    switch (type) {
       case 'image':
-        const url = window.prompt('URL изображения');
+        const url = prompt('Введите URL изображения:');
         if (url) {
           editor.chain().focus().setImage({ src: url }).run();
         }
         break;
       case 'kanban':
-        editor.chain().focus().insertContent({
-          type: 'kanbanBoard',
-          attrs: {}
-        }).run();
+        try {
+          console.log('Вставляем канбан-доску из меню блоков');
+          
+          // Проверяем, может ли редактор выполнить команду вставки
+          if (editor.can().chain().focus().insertContent({ type: 'kanbanBoard', attrs: {} }).run()) {
+            // Вставляем канбан-доску
+            editor.chain().focus().insertContent({ type: 'kanbanBoard', attrs: {} }).run();
+            console.log('Канбан-доска успешно вставлена из меню блоков');
+          } else {
+            console.error('Редактор не может вставить канбан-доску в текущем контексте');
+          }
+        } catch (error) {
+          console.error('Ошибка при вставке канбан-доски из меню блоков:', error);
+        }
         break;
       default:
         break;
@@ -422,7 +399,7 @@ const HTMLBlockNode = Node.create({
         }
       };
     };
-  }
+  },
 });
 
 // Создаем расширение для обработки вставки HTML

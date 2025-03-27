@@ -29,9 +29,9 @@ const KanbanBoardComponent = (props) => {
       { id: 'col-3', title: 'Завершено', cardIds: [] },
     ],
     cards: {
-      'card-1': { id: 'card-1', title: 'Задача 1', description: 'Описание задачи 1', priority: 'medium' },
-      'card-2': { id: 'card-2', title: 'Задача 2', description: 'Описание задачи 2', priority: 'low' },
-      'card-3': { id: 'card-3', title: 'Задача 3', description: 'Описание задачи 3', priority: 'high' },
+      'card-1': { id: 'card-1', title: 'Задача 1', description: 'Описание задачи 1', priority: 'medium', deadline: '' },
+      'card-2': { id: 'card-2', title: 'Задача 2', description: 'Описание задачи 2', priority: 'low', deadline: '' },
+      'card-3': { id: 'card-3', title: 'Задача 3', description: 'Описание задачи 3', priority: 'high', deadline: '' },
     },
     columnOrder: ['col-1', 'col-2', 'col-3'],
     boardTitle: 'Канбан-доска проекта',
@@ -67,31 +67,73 @@ const KanbanBoardComponent = (props) => {
   const [boardState, setBoardState] = useState(initialBoardState);
   const [filterText, setFilterText] = useState('');
   const [filterPriority, setFilterPriority] = useState(null);
+  const [filterDeadline, setFilterDeadline] = useState(null);
 
   // Функция для сохранения состояния в TipTap
   const saveStateToTiptap = useCallback((newState) => {
     if (!editor || !editor.isEditable || !updateAttributes) {
-      console.warn("Не удалось сохранить состояние: editor или updateAttributes недоступны");
-      return;
+      console.error("Не удалось сохранить состояние: editor или updateAttributes недоступны", {
+        editorExists: !!editor,
+        isEditable: editor?.isEditable,
+        updateAttributesExists: !!updateAttributes
+      });
+      return false;
     }
     
     // Проверяем и глубоко клонируем состояние для предотвращения мутаций
     const safeState = JSON.parse(JSON.stringify(newState));
     
-    console.log("Сохраняем в Tiptap:", {
+    // Дополнительная проверка на корректность структуры данных
+    if (!safeState || !safeState.cards || !safeState.columns) {
+      console.error("Некорректная структура данных для сохранения:", safeState);
+      return false;
+    }
+    
+    const timestamp = Date.now();
+    console.log(`[${timestamp}] Сохраняем в Tiptap:`, {
       boardTitle: safeState.boardTitle,
       карточек: Object.keys(safeState.cards || {}).length,
-      колонок: (safeState.columns || []).length
+      колонок: (safeState.columns || []).length,
+      время: new Date().toLocaleTimeString()
     });
     
-    // Используем немедленное обновление атрибутов вместо setTimeout
     try {
+      // Используем только updateAttributes без любых транзакций редактора
       updateAttributes({
-        boardState: safeState,
+        boardState: {
+          ...safeState,
+          _lastUpdateTimestamp: timestamp
+        },
       });
-      console.log("Атрибуты успешно обновлены");
+      
+      // НЕ используем никаких вызовов редактора, которые могут вызвать транзакции
+      // Это помогает избежать конфликтов при вставке канбан-доски
+      
+      console.log(`[${timestamp}] Атрибуты успешно обновлены в ${new Date().toLocaleTimeString()}`);
+      return true;
     } catch (error) {
-      console.error("Ошибка при обновлении атрибутов:", error);
+      console.error(`[${timestamp}] Ошибка при обновлении атрибутов:`, error);
+      
+      // Повторная попытка через небольшую паузу
+      setTimeout(() => {
+        try {
+          console.log(`[${timestamp}] Повторная попытка сохранения...`);
+          updateAttributes({
+            boardState: {
+              ...safeState,
+              _lastUpdateTimestamp: Date.now()
+            },
+          });
+          
+          console.log(`[${timestamp}] Атрибуты успешно обновлены при повторной попытке`);
+          return true;
+        } catch (retryError) {
+          console.error(`[${timestamp}] Ошибка при повторной попытке:`, retryError);
+          return false;
+        }
+      }, 50);
+      
+      return false;
     }
   }, [updateAttributes, editor]);
 
@@ -272,7 +314,9 @@ const KanbanBoardComponent = (props) => {
     const newCard = {
       id: newCardId,
       title: 'Новая задача',
-      description: 'Описание задачи'
+      description: 'Описание задачи',
+      priority: 'medium',
+      deadline: ''
     };
     
     setBoardState(prevState => {
@@ -414,7 +458,8 @@ const KanbanBoardComponent = (props) => {
     // Отладочный вывод для проверки фильтрации
     console.log("Фильтрация:", { 
       текст: filterText, 
-      приоритет: filterPriority, 
+      приоритет: filterPriority,
+      дедлайн: filterDeadline, 
       ids: ids.length,
       колонка: columnId 
     });
@@ -427,12 +472,48 @@ const KanbanBoardComponent = (props) => {
         // Фильтр по тексту
         const textMatch = !filterText || 
           card.title?.toLowerCase().includes(filterText.toLowerCase()) || 
-          card.description?.toLowerCase().includes(filterText.toLowerCase());
+          card.description?.toLowerCase().includes(filterText.toLowerCase()) ||
+          (card.deadline && card.deadline.includes(filterText)); // Учитываем дедлайн при поиске
         
         // Фильтр по приоритету
         const priorityMatch = !filterPriority || card.priority === filterPriority;
         
-        return textMatch && priorityMatch;
+        // Фильтр по дедлайну
+        let deadlineMatch = true;
+        if (filterDeadline) {
+          // Если фильтр "с дедлайном", проверяем, что дедлайн установлен
+          if (filterDeadline === 'with') {
+            deadlineMatch = card.deadline && card.deadline.trim() !== '';
+          }
+          // Если фильтр "без дедлайна", проверяем, что дедлайн не установлен
+          else if (filterDeadline === 'without') {
+            deadlineMatch = !card.deadline || card.deadline.trim() === '';
+          }
+          // Если фильтр "просроченные", проверяем дату дедлайна
+          else if (filterDeadline === 'expired') {
+            if (!card.deadline || card.deadline.trim() === '') {
+              deadlineMatch = false;
+            } else {
+              const deadlineDate = new Date(card.deadline);
+              const currentDate = new Date();
+              deadlineMatch = deadlineDate < currentDate;
+            }
+          }
+          // Если фильтр "ближайшие", проверяем дату дедлайна (в течение 3 дней)
+          else if (filterDeadline === 'upcoming') {
+            if (!card.deadline || card.deadline.trim() === '') {
+              deadlineMatch = false;
+            } else {
+              const deadlineDate = new Date(card.deadline);
+              const currentDate = new Date();
+              const timeDiff = deadlineDate.getTime() - currentDate.getTime();
+              const daysRemaining = Math.ceil(timeDiff / (1000 * 3600 * 24));
+              deadlineMatch = daysRemaining >= 0 && daysRemaining <= 3;
+            }
+          }
+        }
+        
+        return textMatch && priorityMatch && deadlineMatch;
       });
   };
 
@@ -440,7 +521,15 @@ const KanbanBoardComponent = (props) => {
   const calculateStats = () => {
     // Проверяем существование boardState и его свойств
     if (!boardState || !boardState.cards || !boardState.columns) {
-      return { total: 0, completed: 0, inProgress: 0, planned: 0, completionPercentage: 0 };
+      return { 
+        total: 0, 
+        completed: 0, 
+        inProgress: 0, 
+        planned: 0, 
+        completionPercentage: 0,
+        withDeadline: 0,
+        expiredDeadline: 0
+      };
     }
     
     const total = Object.keys(boardState.cards).length;
@@ -448,13 +537,147 @@ const KanbanBoardComponent = (props) => {
     const inProgress = boardState.columns.find(col => col.id === 'col-2')?.cardIds.length || 0;
     const planned = boardState.columns.find(col => col.id === 'col-1')?.cardIds.length || 0;
     
+    // Дополнительная статистика по дедлайнам
+    let withDeadline = 0;
+    let expiredDeadline = 0;
+    const currentDate = new Date();
+
+    Object.values(boardState.cards).forEach(card => {
+      if (card.deadline && card.deadline.trim() !== '') {
+        withDeadline++;
+        const deadlineDate = new Date(card.deadline);
+        if (deadlineDate < currentDate) {
+          expiredDeadline++;
+        }
+      }
+    });
+    
     const completionPercentage = total > 0 ? Math.round((completed / total) * 100) : 0;
     
-    return { total, completed, inProgress, planned, completionPercentage };
+    return { 
+      total, 
+      completed, 
+      inProgress, 
+      planned, 
+      completionPercentage,
+      withDeadline,
+      expiredDeadline
+    };
   };
 
   // Безопасно вычисляем статистику
   const stats = calculateStats();
+
+  // Обработчик изменения дедлайна карточки
+  const handleDeadlineChange = (cardId, newDeadline) => {
+    const logTimestamp = Date.now();
+    
+    if (!boardState || !boardState.cards || !boardState.cards[cardId]) {
+      console.error(`[${logTimestamp}] Ошибка: невозможно изменить дедлайн - карточка не найдена`, cardId);
+      return;
+    }
+    
+    console.log(`[${logTimestamp}] Изменение дедлайна для ${cardId}:`, {
+      старый: boardState.cards[cardId].deadline,
+      новый: newDeadline
+    });
+    
+    try {
+      // Создаем новое состояние явно
+      const updatedState = {
+        ...boardState,
+        cards: {
+          ...boardState.cards,
+          [cardId]: {
+            ...boardState.cards[cardId],
+            deadline: newDeadline || '',
+          },
+        },
+        _updateTimeForDeadline: logTimestamp
+      };
+      
+      // Устанавливаем задержку перед сохранением, чтобы избежать конфликтов при вставке
+      setTimeout(() => {
+        // 1. Сначала сохраняем в Tiptap
+        const saveResult = saveStateToTiptap(updatedState);
+        console.log(`[${logTimestamp}] Результат первичного сохранения:`, saveResult);
+        
+        // 2. Затем обновляем локальное состояние
+        setBoardState(updatedState);
+        
+        // 3. Создаем глобальное событие для уведомления других компонентов
+        const saveEvent = new CustomEvent('kanban-deadline-changed', {
+          detail: { cardId, deadline: newDeadline, timestamp: Date.now() }
+        });
+        document.dispatchEvent(saveEvent);
+      }, 10);
+      
+      // Дополнительная попытка сохранения с задержкой
+      setTimeout(() => {
+        // Сохраняем состояние ещё раз для надежности
+        saveStateToTiptap(updatedState);
+        console.log(`[${logTimestamp}] Выполнено дополнительное сохранение дедлайна`);
+      }, 500);
+      
+    } catch (error) {
+      console.error(`[${logTimestamp}] Критическая ошибка при сохранении дедлайна:`, error);
+    }
+  };
+
+  // Добавляем эффект для проверки ошибок при вставке
+  React.useEffect(() => {
+    // Проверка, была ли канбан-доска только что вставлена
+    const handleError = (error) => {
+      // Если возникла ошибка, связанная с htmlBlock, пытаемся восстановить состояние канбан-доски
+      if (error.message && (
+          error.message.includes('Invalid content for node htmlBlock') || 
+          error.message.includes('канбан') || 
+          error.message.includes('kanban')
+        )) {
+        console.warn("Перехвачена ошибка вставки канбан-доски:", error);
+        
+        // Пытаемся восстановить состояние канбан-доски
+        if (boardState) {
+          setTimeout(() => {
+            console.log("Восстановление состояния канбан-доски после ошибки...");
+            
+            try {
+              // Проверяем наличие функции updateAttributes
+              if (typeof updateAttributes === 'function') {
+                updateAttributes({
+                  boardState: {
+                    ...boardState,
+                    _recoveryTimestamp: Date.now()
+                  }
+                });
+                console.log("Состояние канбан-доски восстановлено");
+              } else {
+                console.error("updateAttributes не является функцией");
+              }
+            } catch (recoveryError) {
+              console.error("Ошибка при восстановлении состояния:", recoveryError);
+            }
+          }, 50);
+        }
+      }
+    };
+
+    // Добавляем глобальный перехватчик ошибок
+    window.addEventListener('error', handleError);
+    
+    // Создаем специальный идентификатор для этой канбан-доски
+    const boardId = `kanban-${instanceId}`;
+    
+    // Добавляем маркер на DOM-элемент
+    const domNode = document.querySelector(`[data-kanban-board="true"]`);
+    if (domNode) {
+      domNode.setAttribute('data-board-id', boardId);
+    }
+    
+    return () => {
+      window.removeEventListener('error', handleError);
+    };
+  }, [boardState, updateAttributes, instanceId]);
 
   // Рендеринг компонента
   return (
@@ -613,6 +836,23 @@ const KanbanBoardComponent = (props) => {
               <option value="medium">Средний</option>
               <option value="high">Высокий</option>
             </select>
+
+            <select
+              value={filterDeadline || ''}
+              onChange={(e) => {
+                e.stopPropagation();
+                setFilterDeadline(e.target.value || null);
+              }}
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              className="text-sm rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-1 px-3 text-gray-900 dark:text-white"
+            >
+              <option value="">Все задачи</option>
+              <option value="with">С дедлайном</option>
+              <option value="without">Без дедлайна</option>
+              <option value="expired">Просроченные</option>
+              <option value="upcoming">Ближайшие</option>
+            </select>
           </div>
         </div>
 
@@ -631,6 +871,16 @@ const KanbanBoardComponent = (props) => {
               <div className="stat-item text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 py-1 px-2 rounded">
                 <span className="font-medium">Планируется:</span> {stats.planned}
               </div>
+              {stats.withDeadline > 0 && (
+                <div className="stat-item text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300 py-1 px-2 rounded">
+                  <span className="font-medium">С дедлайном:</span> {stats.withDeadline}
+                </div>
+              )}
+              {stats.expiredDeadline > 0 && (
+                <div className="stat-item text-xs bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 py-1 px-2 rounded">
+                  <span className="font-medium">Просрочено:</span> {stats.expiredDeadline}
+                </div>
+              )}
             </div>
             
             <div className="hidden sm:flex items-center">
@@ -666,6 +916,7 @@ const KanbanBoardComponent = (props) => {
                 handleCardTitleChange={handleCardTitleChange}
                 handleCardDescriptionChange={handleCardDescriptionChange}
                 handleCardPriorityChange={handleCardPriorityChange}
+                handleDeadlineChange={handleDeadlineChange}
                 handleDragStart={handleDragStart}
                 handleDrop={handleDrop}
                 isFirstColumn={isFirstColumn}

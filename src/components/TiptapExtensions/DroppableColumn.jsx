@@ -11,6 +11,7 @@ const DroppableColumn = ({
   handleCardTitleChange, 
   handleCardDescriptionChange, 
   handleCardPriorityChange, 
+  handleDeadlineChange,
   handleDragStart, 
   handleDrop, 
   isFirstColumn 
@@ -52,6 +53,7 @@ const DroppableColumn = ({
             handleCardTitleChange={handleCardTitleChange}
             handleCardDescriptionChange={handleCardDescriptionChange}
             handleCardPriorityChange={handleCardPriorityChange}
+            handleDeadlineChange={handleDeadlineChange}
             handleDragStart={handleDragStart}
             isLastCard={index === cards.length - 1}
           />
