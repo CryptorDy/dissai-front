@@ -1140,6 +1140,23 @@ export function RichTextEditor({
     };
   }, [editor, autoSave, itemId, onChange, forceSave]);
 
+  // Функция для обновления содержимого
+  const handleContentChange = (newContent: string) => {
+    if (onChange) {
+      // Проверяем, действительно ли содержимое изменилось
+      if (content !== newContent) {
+        onChange(newContent);
+      }
+    }
+  };
+
+  // Функция для сохранения изменений
+  const handleSave = () => {
+    if (onSave) {
+      onSave();
+    }
+  };
+
   return (
     <div className={withBackground ? "bg-white dark:bg-gray-800 rounded-xl p-8" : ""}>
       <div className="flex justify-between items-center mb-6">

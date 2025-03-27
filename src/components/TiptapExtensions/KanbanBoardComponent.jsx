@@ -51,21 +51,27 @@ const KanbanBoardComponent = (props) => {
         return defaultBoardState;
       }
       
-      // Проверяем, что структура данных полная
+      // Получаем данные из атрибутов
       const data = node.attrs.boardState;
+      
+      // Проверяем, есть ли вложенный объект boardState
+      const boardData = data.boardState || data;
+      
+      // Проверяем, что структура данных полная
       const hasRequiredProperties = 
-        data.columns && 
-        data.cards && 
-        data.columnOrder && 
-        typeof data.boardTitle === 'string';
+        boardData.columns && 
+        boardData.cards && 
+        boardData.columnOrder && 
+        typeof boardData.boardTitle === 'string';
         
       if (!hasRequiredProperties) {
+        console.warn(`[${instanceId}] Неполные данные в boardState:`, boardData);
         return defaultBoardState;
       }
       
-      return data;
+      return boardData;
     } catch (error) {
-      console.error("Ошибка при инициализации состояния канбан-доски:", error);
+      console.error(`[${instanceId}] Ошибка при инициализации состояния канбан-доски:`, error);
       return defaultBoardState;
     }
   })();
@@ -75,105 +81,132 @@ const KanbanBoardComponent = (props) => {
   const [filterPriority, setFilterPriority] = useState(null);
   const [filterDeadline, setFilterDeadline] = useState(null);
 
-  // Функция для сохранения состояния в TipTap
-  const saveStateToTiptap = useCallback((newState) => {
-    if (!editor || !editor.isEditable || !updateAttributes) {
-      console.error("Не удалось сохранить состояние: editor или updateAttributes недоступны", {
-        editorExists: !!editor,
-        isEditable: editor?.isEditable,
-        updateAttributesExists: !!updateAttributes
-      });
-      return false;
-    }
-    
-    // Проверяем и глубоко клонируем состояние для предотвращения мутаций
-    const safeState = JSON.parse(JSON.stringify(newState));
-    
-    // Дополнительная проверка на корректность структуры данных
-    if (!safeState || !safeState.cards || !safeState.columns) {
-      console.error("Некорректная структура данных для сохранения:", safeState);
-      return false;
-    }
-    
-    const timestamp = Date.now();
-    console.log(`[${timestamp}] Сохраняем в Tiptap:`, {
-      boardTitle: safeState.boardTitle,
-      карточек: Object.keys(safeState.cards || {}).length,
-      колонок: (safeState.columns || []).length,
-      время: new Date().toLocaleTimeString()
-    });
+  // Используем useLayoutEffect для предотвращения flushSync warning
+  React.useLayoutEffect(() => {
+    if (!node?.attrs?.boardState) return;
     
     try {
-      // Используем только updateAttributes без любых транзакций редактора
-      updateAttributes({
-        boardState: {
-          ...safeState,
-          _lastUpdateTimestamp: timestamp
-        },
-      });
+      // Мемоизируем данные для предотвращения лишних ре-рендеров
+      const data = JSON.parse(JSON.stringify(node.attrs.boardState));
       
-      // Создаем пользовательское событие для принудительного обновления редактора
-      const customEvent = new CustomEvent('kanban-content-changed', {
-        bubbles: true,
-        cancelable: true,
-        detail: { timestamp, boardId: instanceId || `kanban-fallback-${timestamp}` }
-      });
+      // Проверяем, есть ли вложенный объект boardState
+      const boardData = data.boardState || data;
       
-      // 1. Диспетчеризуем событие на DOM-элементе редактора
-      if (editor && editor.view && editor.view.dom) {
-        editor.view.dom.dispatchEvent(customEvent);
-      }
-      
-      // 2. Принудительно вызываем transaction с изменением содержимого
-      if (editor) {
-        try {
-          // Находим позицию узла канбан-доски
-          const { state } = editor;
-          const { doc } = state;
-          let pos = null;
-          
-          doc.descendants((node, position) => {
-            if (node.type.name === 'kanbanBoard') {
-              pos = position;
-              return false; // прекращаем поиск
-            }
-            return true;
+      // Проверяем, что данные действительно изменились
+      if (boardData && boardData.columns && boardData.cards && boardData.columnOrder) {
+        // Удаляем служебные поля для сравнения
+        const { _lastSaved, _recoveryTimestamp, ...dataToCompare } = boardData;
+        const { _lastSaved: currentLastSaved, _recoveryTimestamp: currentRecoveryTimestamp, ...currentToCompare } = boardState;
+        
+        // Сравниваем только значимые данные
+        const dataString = JSON.stringify(dataToCompare);
+        const currentString = JSON.stringify(currentToCompare);
+
+        // Обновляем состояние только если данные действительно изменились
+        if (dataString !== currentString) {
+          console.log(`[${instanceId}] Обновление состояния из атрибутов:`, {
+            dataString,
+            currentString
           });
-          
-          if (pos !== null) {
-            // Вставляем пустую транзакцию с метаданными, чтобы обновить редактор
-            const tr = editor.state.tr.setMeta('kanban-update', { 
-              boardId: instanceId || `kanban-fallback-${timestamp}`,
-              timestamp
-            });
-            
-            // Делаем незначительное изменение, чтобы гарантировать docChanged
-            tr.insertText(' ', pos);
-            tr.insertText('', pos, pos + 1); // тут же удаляем его
-            
-            // Помечаем, что это изменение должно быть добавлено в историю
-            tr.setMeta('addToHistory', true);
-            
-            // Отправляем транзакцию
-            editor.view.dispatch(tr);
-          }
-        } catch (trError) {
-          console.error(`[${timestamp}] Ошибка при создании транзакции:`, trError);
+          setBoardState(boardData);
         }
       }
-      
-      // 3. Диспетчеризуем глобальное событие для родительских компонентов
-      document.dispatchEvent(new CustomEvent('kanban-state-updated', {
-        detail: { timestamp, boardId: instanceId || `kanban-fallback-${timestamp}` }
-      }));
-      
-      console.log(`[${timestamp}] Атрибуты успешно обновлены в ${new Date().toLocaleTimeString()}`);
-      return true;
     } catch (error) {
-      console.error(`[${timestamp}] Ошибка при обновлении атрибутов:`, error);
-      return false;
+      console.error(`[${instanceId}] Ошибка при обработке данных:`, error);
     }
-  }, [updateAttributes, editor, instanceId]);
+  }, [node?.attrs?.boardState, instanceId]);
+
+  // Функция сохранения состояния канбана в Tiptap
+  const saveStateToTiptap = useCallback((currentState) => {
+    if (!updateAttributes || typeof updateAttributes !== 'function') {
+      console.error('Ошибка: функция updateAttributes недоступна');
+      return;
+    }
+
+    // Добавляем таймштамп последнего сохранения для отслеживания
+    const stateToSave = {
+      ...currentState,
+      _lastSaved: Date.now()
+    };
+
+    // Проверяем, действительно ли состояние изменилось
+    const { _lastSaved: currentLastSaved, _recoveryTimestamp: currentRecoveryTimestamp, ...currentToCompare } = currentState;
+    const { _lastSaved: savedLastSaved, _recoveryTimestamp: savedRecoveryTimestamp, ...savedToCompare } = node?.attrs?.boardState || {};
+
+    // Сравниваем только значимые данные
+    const currentString = JSON.stringify(currentToCompare);
+    const savedString = JSON.stringify(savedToCompare);
+
+    if (currentString === savedString) {
+      console.log(`[${instanceId}] Состояние не изменилось, пропускаем сохранение`);
+      return;
+    }
+
+    // Логирование
+    console.log(`[${instanceId}] Сохранение состояния канбана:`, {
+      columnsCount: stateToSave.columns.length,
+      cardsCount: Object.keys(stateToSave.cards).length,
+      currentState: currentString,
+      savedState: savedString
+    });
+
+    try {
+      // Сохраняем состояние в атрибутах ноды Tiptap без requestAnimationFrame
+      updateAttributes({
+        boardState: stateToSave
+      });
+    } catch (error) {
+      console.error(`[${instanceId}] Ошибка при сохранении состояния канбана:`, error);
+    }
+  }, [updateAttributes, instanceId, node?.attrs?.boardState]);
+
+  // Функция отложенного сохранения с дебаунсом
+  const debouncedSaveState = useCallback((state) => {
+    // Проверяем, действительно ли состояние изменилось
+    const { _lastSaved: currentLastSaved, _recoveryTimestamp: currentRecoveryTimestamp, ...currentToCompare } = state;
+    const { _lastSaved: savedLastSaved, _recoveryTimestamp: savedRecoveryTimestamp, ...savedToCompare } = node?.attrs?.boardState || {};
+
+    // Сравниваем только значимые данные
+    const currentString = JSON.stringify(currentToCompare);
+    const savedString = JSON.stringify(savedToCompare);
+
+    if (currentString === savedString) {
+      console.log(`[${instanceId}] Состояние не изменилось, пропускаем отложенное сохранение`);
+      return;
+    }
+
+    // Отменяем предыдущий таймаут, если он существует
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    // Устанавливаем новый таймаут для отложенного сохранения
+    saveTimeoutRef.current = setTimeout(() => {
+      saveStateToTiptap(state);
+      saveTimeoutRef.current = null;
+    }, 500); // Дебаунс 500 мс
+  }, [saveStateToTiptap, node?.attrs?.boardState, instanceId]);
+
+  // Эффект для отслеживания изменений состояния и его сохранения
+  useEffect(() => {
+    // Проверяем, что состояние инициализировано
+    if (boardState && boardState.columns && boardState.cards) {
+      // Проверяем, действительно ли состояние изменилось
+      const { _lastSaved: currentLastSaved, _recoveryTimestamp: currentRecoveryTimestamp, ...currentToCompare } = boardState;
+      const { _lastSaved: savedLastSaved, _recoveryTimestamp: savedRecoveryTimestamp, ...savedToCompare } = node?.attrs?.boardState || {};
+
+      // Сравниваем только значимые данные
+      const currentString = JSON.stringify(currentToCompare);
+      const savedString = JSON.stringify(savedToCompare);
+
+      if (currentString !== savedString) {
+        // Сохраняем состояние с дебаунсом только если оно действительно изменилось
+        debouncedSaveState(boardState);
+      } else {
+        console.log(`[${instanceId}] Состояние не изменилось, пропускаем автосохранение`);
+      }
+    }
+  }, [boardState, debouncedSaveState, node?.attrs?.boardState, instanceId]);
 
   // Функция сохранения при потере фокуса - немедленное сохранение
   const handleTitleBlur = () => {
@@ -182,30 +215,9 @@ const KanbanBoardComponent = (props) => {
       saveTimeoutRef.current = null;
     }
     
-    console.log("Потеря фокуса заголовка, немедленное сохранение:", boardState?.boardTitle);
+    // Немедленно сохраняем состояние
     saveStateToTiptap(boardState);
   };
-
-  // Используем useLayoutEffect для предотвращения flushSync warning
-  React.useLayoutEffect(() => {
-    if (!node?.attrs?.boardState) return;
-    
-    try {
-      // Мемоизируем данные для предотвращения лишних ре-рендеров
-      const data = JSON.parse(JSON.stringify(node.attrs.boardState));
-      if (data && data.columns && data.cards && data.columnOrder) {
-        setBoardState(prevState => {
-          // Сравниваем, действительно ли данные изменились
-          if (JSON.stringify(prevState) === JSON.stringify(data)) {
-            return prevState;
-          }
-          return data;
-        });
-      }
-    } catch (error) {
-      console.error(`[${instanceId}] Ошибка при обработке данных:`, error);
-    }
-  }, [node?.attrs?.boardState, instanceId]);
 
   // Обработчики событий
 
@@ -266,7 +278,7 @@ const KanbanBoardComponent = (props) => {
         },
       };
       
-      // Асинхронно сохраняем в Tiptap
+      // Немедленно сохраняем важные изменения
       saveStateToTiptap(updatedState);
       
       return updatedState;
@@ -282,15 +294,16 @@ const KanbanBoardComponent = (props) => {
       
       const updatedState = {
         ...prevState,
-      cards: {
+        cards: {
           ...prevState.cards,
-        [cardId]: {
+          [cardId]: {
             ...prevState.cards[cardId],
-          description: newDescription,
+            description: newDescription,
+          },
         },
-      },
-    };
+      };
       
+      // Немедленно сохраняем важные изменения
       saveStateToTiptap(updatedState);
       
       return updatedState;
@@ -315,6 +328,7 @@ const KanbanBoardComponent = (props) => {
         },
       };
       
+      // Немедленно сохраняем важные изменения
       saveStateToTiptap(updatedState);
       
       return updatedState;
@@ -335,6 +349,7 @@ const KanbanBoardComponent = (props) => {
       )
     };
       
+      // Сохраняем с дебаунсом после обновления состояния
       saveStateToTiptap(updatedState);
       
       return updatedState;
@@ -369,7 +384,8 @@ const KanbanBoardComponent = (props) => {
           : col
       ),
     };
-    
+      
+      // Сохраняем с дебаунсом после обновления состояния
       saveStateToTiptap(updatedState);
       
       return updatedState;
@@ -398,6 +414,7 @@ const KanbanBoardComponent = (props) => {
         columns: newColumns,
       };
       
+      // Сохраняем с дебаунсом после обновления состояния
       saveStateToTiptap(updatedState);
       
       return updatedState;
@@ -438,6 +455,7 @@ const KanbanBoardComponent = (props) => {
         }),
       };
       
+      // Сохраняем немедленно без дебаунса, так как это важная операция
       saveStateToTiptap(updatedState);
       
       return updatedState;
@@ -467,8 +485,8 @@ const KanbanBoardComponent = (props) => {
       clearTimeout(saveTimeoutRef.current);
     }
     
-    // Сохраняем изменения немедленно
-    saveStateToTiptap(updatedState);
+    // Сохраняем с дебаунсом
+    debouncedSaveState(updatedState);
   };
   
   // Очистка таймаута при размонтировании
@@ -578,9 +596,8 @@ const KanbanBoardComponent = (props) => {
       // Обновляем локальное состояние
       setBoardState(updatedState);
       
-      // Сохраняем в Tiptap только один раз
-      // Удаляем дополнительные вызовы saveStateToTiptap, которые вызывают циклы
-      saveStateToTiptap(updatedState);
+      // Сохраняем с дебаунсом
+      debouncedSaveState(updatedState);
     } catch (error) {
       console.error(`[${logTimestamp}] Критическая ошибка при сохранении дедлайна:`, error);
     }

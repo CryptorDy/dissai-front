@@ -66,27 +66,6 @@ const KanbanBoardComponent: React.FC<NodeViewProps> = (props) => {
   const [filterText, setFilterText] = useState('');
   const [filterPriority, setFilterPriority] = useState<string | null>(null);
 
-  // Функция для сохранения состояния в TipTap
-  const saveStateToTiptap = useCallback((newState: BoardState) => {
-    if (!editor.isEditable) return;
-    
-    try {
-      // Делаем глубокую копию объекта, чтобы избежать проблем с реактивностью
-      const stateCopy = JSON.parse(JSON.stringify(newState));
-      
-      // Обновляем атрибуты ноды
-      updateAttributes({
-        boardState: stateCopy
-      });
-      
-      // Отмечаем, что редактор изменился
-      const tr = editor.view.state.tr;
-      editor.view.dispatch(tr);
-    } catch (error) {
-      console.error('Ошибка при сохранении состояния канбан-доски:', error);
-    }
-  }, [updateAttributes, editor.isEditable, editor.view]);
-
   // Отслеживаем изменения в свойствах node, чтобы обновить состояние при смене файла
   useEffect(() => {
     try {
@@ -121,7 +100,6 @@ const KanbanBoardComponent: React.FC<NodeViewProps> = (props) => {
       },
     };
     setBoardState(newState);
-    saveStateToTiptap(newState);
   };
 
   // Изменение описания карточки
@@ -137,7 +115,6 @@ const KanbanBoardComponent: React.FC<NodeViewProps> = (props) => {
       },
     };
     setBoardState(newState);
-    saveStateToTiptap(newState);
   };
 
   // Изменение приоритета карточки
@@ -153,7 +130,6 @@ const KanbanBoardComponent: React.FC<NodeViewProps> = (props) => {
       },
     };
     setBoardState(newState);
-    saveStateToTiptap(newState);
   };
 
   // Изменение заголовка колонки
@@ -165,7 +141,6 @@ const KanbanBoardComponent: React.FC<NodeViewProps> = (props) => {
       )
     };
     setBoardState(newState);
-    saveStateToTiptap(newState);
   };
 
   // Добавление новой карточки
@@ -191,7 +166,6 @@ const KanbanBoardComponent: React.FC<NodeViewProps> = (props) => {
     };
     
     setBoardState(newState);
-    saveStateToTiptap(newState);
   };
 
   // Удаление карточки
@@ -212,7 +186,6 @@ const KanbanBoardComponent: React.FC<NodeViewProps> = (props) => {
     };
     
     setBoardState(newState);
-    saveStateToTiptap(newState);
   };
 
   // Фильтрация карточек

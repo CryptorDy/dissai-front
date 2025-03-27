@@ -1242,111 +1242,50 @@ function Knowledge() {
   };
 
   const handleSelectItem = async (item: KnowledgeItem) => {
-    try {
-      if (!item || !item.id) {
-        console.error('handleSelectItem: Получен некорректный элемент без id');
-        return;
-      }
+    // Проверяем, что элемент существует
+    if (!item) {
+      console.error('handleSelectItem: Получен пустой элемент');
+      return;
+    }
 
-      // Проверяем, является ли ID временным
-      const isTemporary = item.id.startsWith('temp-');
-      console.log(`Выбран элемент: ${item.id} (временный: ${isTemporary})`);
+    // Проверяем, является ли элемент временным
+    const isTemporary = item.id.startsWith('temp-');
 
-      // Проверяем и исправляем временный parentId перед дальнейшей обработкой
-      let itemWithFixedParent = { ...item };
-      
-      // Проверяем, не является ли parentId временным
-      if (item.parentId && item.parentId.startsWith('temp-')) {
-        console.log('ВНИМАНИЕ: У элемента', item.id, 'временный parentId:', item.parentId);
-        console.log('Пытаемся исправить временный parentId...');
-        
-        try {
-          // Используем функцию исправления временного parentId
-          itemWithFixedParent = checkAndFixTemporaryParentId(item);
-          
-          // Обновляем элемент в состоянии, если parentId был исправлен
-          if (itemWithFixedParent.parentId !== item.parentId) {
-            console.log('Исправлен parentId с', item.parentId, 'на', itemWithFixedParent.parentId);
-            
-            // Обновляем состояние с исправленным parentId
-            setItems(prev => {
-              const updateItems = (items: KnowledgeItem[]): KnowledgeItem[] => {
-                if (!items || !Array.isArray(items)) return [];
-                
-                return items.map(i => {
-                  if (!i) return i;
-                  if (i.id === item.id) {
-                    return {
-                      ...i,
-                      parentId: itemWithFixedParent.parentId
-                    };
-                  }
-                  if (i.children && Array.isArray(i.children)) {
-                    return {
-                      ...i,
-                      children: updateItems(i.children)
-                    };
-                  }
-                  return i;
-                });
-              };
-              return updateItems(prev);
-            });
+    // Проверяем и исправляем временный parentId
+    const itemWithFixedParent = checkAndFixTemporaryParentId(item);
+
+    // Дополнительная проверка - если ID временный, ищем возможное обновление ID в состоянии
+    if (isTemporary) {
+      // Просто используем локальное состояние без запроса к серверу
+      console.log('Выбран временный элемент:', itemWithFixedParent.id);
+      setSelectedItem(itemWithFixedParent);
+      return;
+    }
+    
+    // Если выбран элемент типа файл и НЕ временный, проверяем необходимость загрузки
+    if (itemWithFixedParent.itemType === 'file') {
+      try {
+        // Проверяем, совпадает ли текущий выбранный элемент с выбранным
+        if (selectedItem?.id === itemWithFixedParent.id) {
+          // Если это тот же файл и у нас есть его содержимое, пропускаем загрузку
+          if (selectedItem.content) {
+            console.log('Пропускаем загрузку файла, так как он уже загружен:', itemWithFixedParent.id);
+            return;
           }
-        } catch (error) {
-          console.error('Ошибка при исправлении временного parentId:', error);
-          // Устанавливаем parentId в null в случае ошибки
-          itemWithFixedParent = { ...item, parentId: null };
         }
-      }
 
-      // Дополнительная проверка - если ID временный, ищем возможное обновление ID в состоянии
-      if (isTemporary) {
-        // Просто используем локальное состояние без запроса к серверу
-        console.log('Выбран временный элемент:', itemWithFixedParent.id);
+        console.log('Загружаем файл по ID:', itemWithFixedParent.id);
+        // Загружаем полное содержимое файла с сервера
+        const fullItem = await knowledgeApi.getFile(itemWithFixedParent.id);
+        setSelectedItem(fullItem);
+      } catch (error) {
+        console.error('Ошибка при загрузке файла:', error);
         setSelectedItem(itemWithFixedParent);
-        return;
+        showError('Ошибка при загрузке содержимого файла');
       }
-      
-      // Если выбран элемент типа файл и НЕ временный, загружаем его содержимое
-      if (itemWithFixedParent.itemType === 'file') {
-        try {
-          console.log('Загружаем файл по ID:', itemWithFixedParent.id);
-          // Загружаем полное содержимое файла с сервера
-          const fullItem = await knowledgeApi.getFile(itemWithFixedParent.id);
-          setSelectedItem(fullItem);
-        } catch (error) {
-          console.error('Ошибка при загрузке файла:', error);
-          setSelectedItem(itemWithFixedParent);
-          showError('Ошибка при загрузке содержимого файла');
-        }
-      } else {
-        // Для папок просто устанавливаем выбранный элемент из локальных данных
-        setSelectedItem(itemWithFixedParent);
-      }
-      
-      // Если выбран элемент, раскрываем все родительские папки
-      if (itemWithFixedParent.parentId) {
-        try {
-          const parentFolders = findParentFolders(items, itemWithFixedParent.id);
-          if (parentFolders.length > 0) {
-            setExpandedFolders(prev => {
-              const newExpanded = [...prev];
-              parentFolders.forEach(folderId => {
-                if (!newExpanded.includes(folderId)) {
-                  newExpanded.push(folderId);
-                }
-              });
-              return newExpanded;
-            });
-          }
-        } catch (error) {
-          console.error('Ошибка при раскрытии родительских папок:', error);
-        }
-      }
-    } catch (error) {
-      console.error('Неожиданная ошибка при выборе элемента:', error);
-      showError('Произошла ошибка при выборе элемента');
+    } else {
+      // Для папок просто устанавливаем выбранный элемент из локальных данных
+      setSelectedItem(itemWithFixedParent);
     }
   };
 

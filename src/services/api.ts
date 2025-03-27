@@ -124,7 +124,6 @@ function mapCamelCaseToKnowledgeItemDto(item: any): KnowledgeItemDto {
 function mapKnowledgeItemToApi(item: KnowledgeItem): any {
   
   if (!item) {
-    console.error('mapKnowledgeItemToApi: Получен пустой объект!');
     return null;
   }
   
@@ -220,7 +219,6 @@ export const knowledgeApi = {
   
   // Создание или обновление элемента
   save: (data: KnowledgeItem) => {
-    console.log('knowledgeApi.save: Начало запроса с данными:', JSON.stringify(data));
     
     // Проверим, что получили корректные данные
     if (!data) {
@@ -246,7 +244,6 @@ export const knowledgeApi = {
     
     // Преобразуем данные для сервера без добавления значений по умолчанию
     const serverData = mapKnowledgeItemToApi(data);
-    console.log('knowledgeApi.save: Данные для отправки на сервер:', JSON.stringify(serverData));
     
     // Дополнительные проверки после маппинга
     if (!serverData.name || !serverData.itemType) {
