@@ -21,6 +21,12 @@ const KanbanBoardComponent = (props) => {
   const [draggedCardId, setDraggedCardId] = useState(null);
   const [draggedFromColumnId, setDraggedFromColumnId] = useState(null);
 
+  // Защита от проблем с рендерингом при нескольких экземплярах
+  const instanceId = React.useMemo(() => `kanban-${generateId()}`, []);
+  
+  // Референс для таймаута сохранения
+  const saveTimeoutRef = React.useRef(null);
+
   // Инициализируем состояние из атрибутов ноды Tiptap
   const defaultBoardState = {
     columns: [
@@ -106,36 +112,68 @@ const KanbanBoardComponent = (props) => {
         },
       });
       
-      // НЕ используем никаких вызовов редактора, которые могут вызвать транзакции
-      // Это помогает избежать конфликтов при вставке канбан-доски
+      // Создаем пользовательское событие для принудительного обновления редактора
+      const customEvent = new CustomEvent('kanban-content-changed', {
+        bubbles: true,
+        cancelable: true,
+        detail: { timestamp, boardId: instanceId || `kanban-fallback-${timestamp}` }
+      });
+      
+      // 1. Диспетчеризуем событие на DOM-элементе редактора
+      if (editor && editor.view && editor.view.dom) {
+        editor.view.dom.dispatchEvent(customEvent);
+      }
+      
+      // 2. Принудительно вызываем transaction с изменением содержимого
+      if (editor) {
+        try {
+          // Находим позицию узла канбан-доски
+          const { state } = editor;
+          const { doc } = state;
+          let pos = null;
+          
+          doc.descendants((node, position) => {
+            if (node.type.name === 'kanbanBoard') {
+              pos = position;
+              return false; // прекращаем поиск
+            }
+            return true;
+          });
+          
+          if (pos !== null) {
+            // Вставляем пустую транзакцию с метаданными, чтобы обновить редактор
+            const tr = editor.state.tr.setMeta('kanban-update', { 
+              boardId: instanceId || `kanban-fallback-${timestamp}`,
+              timestamp
+            });
+            
+            // Делаем незначительное изменение, чтобы гарантировать docChanged
+            tr.insertText(' ', pos);
+            tr.insertText('', pos, pos + 1); // тут же удаляем его
+            
+            // Помечаем, что это изменение должно быть добавлено в историю
+            tr.setMeta('addToHistory', true);
+            
+            // Отправляем транзакцию
+            editor.view.dispatch(tr);
+          }
+        } catch (trError) {
+          console.error(`[${timestamp}] Ошибка при создании транзакции:`, trError);
+        }
+      }
+      
+      // 3. Диспетчеризуем глобальное событие для родительских компонентов
+      document.dispatchEvent(new CustomEvent('kanban-state-updated', {
+        detail: { timestamp, boardId: instanceId || `kanban-fallback-${timestamp}` }
+      }));
       
       console.log(`[${timestamp}] Атрибуты успешно обновлены в ${new Date().toLocaleTimeString()}`);
       return true;
     } catch (error) {
       console.error(`[${timestamp}] Ошибка при обновлении атрибутов:`, error);
-      
-      // Повторная попытка через небольшую паузу
-      setTimeout(() => {
-        try {
-          console.log(`[${timestamp}] Повторная попытка сохранения...`);
-          updateAttributes({
-            boardState: {
-              ...safeState,
-              _lastUpdateTimestamp: Date.now()
-            },
-          });
-          
-          console.log(`[${timestamp}] Атрибуты успешно обновлены при повторной попытке`);
-          return true;
-        } catch (retryError) {
-          console.error(`[${timestamp}] Ошибка при повторной попытке:`, retryError);
-          return false;
-        }
-      }, 50);
-      
       return false;
     }
-  }, [updateAttributes, editor]);
+  }, [updateAttributes, editor, instanceId]);
 
   // Функция сохранения при потере фокуса - немедленное сохранение
   const handleTitleBlur = () => {
@@ -148,9 +186,6 @@ const KanbanBoardComponent = (props) => {
     saveStateToTiptap(boardState);
   };
 
-  // Защита от проблем с рендерингом при нескольких экземплярах
-  const instanceId = React.useMemo(() => `kanban-${generateId()}`, []);
-  
   // Используем useLayoutEffect для предотвращения flushSync warning
   React.useLayoutEffect(() => {
     if (!node?.attrs?.boardState) return;
@@ -247,14 +282,14 @@ const KanbanBoardComponent = (props) => {
       
       const updatedState = {
         ...prevState,
-        cards: {
+      cards: {
           ...prevState.cards,
-          [cardId]: {
+        [cardId]: {
             ...prevState.cards[cardId],
-            description: newDescription,
-          },
+          description: newDescription,
         },
-      };
+      },
+    };
       
       saveStateToTiptap(updatedState);
       
@@ -296,9 +331,9 @@ const KanbanBoardComponent = (props) => {
       const updatedState = {
         ...prevState,
         columns: prevState.columns.map(col => 
-          col.id === columnId ? { ...col, title: newTitle } : col
-        )
-      };
+        col.id === columnId ? { ...col, title: newTitle } : col
+      )
+    };
       
       saveStateToTiptap(updatedState);
       
@@ -324,17 +359,17 @@ const KanbanBoardComponent = (props) => {
       
       const updatedState = {
         ...prevState,
-        cards: {
+      cards: {
           ...prevState.cards,
-          [newCardId]: newCard,
-        },
+        [newCardId]: newCard,
+      },
         columns: prevState.columns.map(col =>
-          col.id === columnId
+        col.id === columnId
             ? { ...col, cardIds: [...(col.cardIds || []), newCardId] }
-            : col
-        ),
-      };
-      
+          : col
+      ),
+    };
+    
       saveStateToTiptap(updatedState);
       
       return updatedState;
@@ -349,13 +384,13 @@ const KanbanBoardComponent = (props) => {
       if (!prevState || !prevState.columns || !prevState.cards) return prevState;
       
       const newColumns = prevState.columns.map(col =>
-        col.id === columnId
+      col.id === columnId
           ? { ...col, cardIds: (col.cardIds || []).filter(id => id !== cardId) }
-          : col
-      );
-      
+        : col
+    );
+    
       const newCards = { ...prevState.cards };
-      delete newCards[cardId];
+    delete newCards[cardId];
       
       const updatedState = {
         ...prevState,
@@ -436,9 +471,6 @@ const KanbanBoardComponent = (props) => {
     saveStateToTiptap(updatedState);
   };
   
-  // Референс для таймаута сохранения
-  const saveTimeoutRef = React.useRef(null);
-  
   // Очистка таймаута при размонтировании
   React.useEffect(() => {
     return () => {
@@ -455,66 +487,9 @@ const KanbanBoardComponent = (props) => {
     // Проверяем, что cardIds существует и это массив
     const ids = Array.isArray(cardIds) ? cardIds : [];
     
-    // Отладочный вывод для проверки фильтрации
-    console.log("Фильтрация:", { 
-      текст: filterText, 
-      приоритет: filterPriority,
-      дедлайн: filterDeadline, 
-      ids: ids.length,
-      колонка: columnId 
-    });
-    
-    return ids
-      .map(cardId => boardState.cards[cardId])
-      .filter(card => {
-        if (!card) return false;
-        
-        // Фильтр по тексту
-        const textMatch = !filterText || 
-          card.title?.toLowerCase().includes(filterText.toLowerCase()) || 
-          card.description?.toLowerCase().includes(filterText.toLowerCase()) ||
-          (card.deadline && card.deadline.includes(filterText)); // Учитываем дедлайн при поиске
-        
-        // Фильтр по приоритету
-        const priorityMatch = !filterPriority || card.priority === filterPriority;
-        
-        // Фильтр по дедлайну
-        let deadlineMatch = true;
-        if (filterDeadline) {
-          // Если фильтр "с дедлайном", проверяем, что дедлайн установлен
-          if (filterDeadline === 'with') {
-            deadlineMatch = card.deadline && card.deadline.trim() !== '';
-          }
-          // Если фильтр "без дедлайна", проверяем, что дедлайн не установлен
-          else if (filterDeadline === 'without') {
-            deadlineMatch = !card.deadline || card.deadline.trim() === '';
-          }
-          // Если фильтр "просроченные", проверяем дату дедлайна
-          else if (filterDeadline === 'expired') {
-            if (!card.deadline || card.deadline.trim() === '') {
-              deadlineMatch = false;
-            } else {
-              const deadlineDate = new Date(card.deadline);
-              const currentDate = new Date();
-              deadlineMatch = deadlineDate < currentDate;
-            }
-          }
-          // Если фильтр "ближайшие", проверяем дату дедлайна (в течение 3 дней)
-          else if (filterDeadline === 'upcoming') {
-            if (!card.deadline || card.deadline.trim() === '') {
-              deadlineMatch = false;
-            } else {
-              const deadlineDate = new Date(card.deadline);
-              const currentDate = new Date();
-              const timeDiff = deadlineDate.getTime() - currentDate.getTime();
-              const daysRemaining = Math.ceil(timeDiff / (1000 * 3600 * 24));
-              deadlineMatch = daysRemaining >= 0 && daysRemaining <= 3;
-            }
-          }
-        }
-        
-        return textMatch && priorityMatch && deadlineMatch;
-      });
+    // Поскольку элементы фильтрации были удалены из UI,
+    // возвращаем все карточки без фильтрации
+    return ids.map(cardId => boardState.cards[cardId]).filter(card => card !== undefined);
   };
 
   // Статистика задач
@@ -576,6 +551,11 @@ const KanbanBoardComponent = (props) => {
       console.error(`[${logTimestamp}] Ошибка: невозможно изменить дедлайн - карточка не найдена`, cardId);
       return;
     }
+
+    // Проверка: если дедлайн не изменился, то не делаем ничего
+    if (boardState.cards[cardId].deadline === newDeadline) {
+      return;
+    }
     
     console.log(`[${logTimestamp}] Изменение дедлайна для ${cardId}:`, {
       старый: boardState.cards[cardId].deadline,
@@ -592,33 +572,15 @@ const KanbanBoardComponent = (props) => {
             ...boardState.cards[cardId],
             deadline: newDeadline || '',
           },
-        },
-        _updateTimeForDeadline: logTimestamp
+        }
       };
       
-      // Устанавливаем задержку перед сохранением, чтобы избежать конфликтов при вставке
-      setTimeout(() => {
-        // 1. Сначала сохраняем в Tiptap
-        const saveResult = saveStateToTiptap(updatedState);
-        console.log(`[${logTimestamp}] Результат первичного сохранения:`, saveResult);
-        
-        // 2. Затем обновляем локальное состояние
-        setBoardState(updatedState);
-        
-        // 3. Создаем глобальное событие для уведомления других компонентов
-        const saveEvent = new CustomEvent('kanban-deadline-changed', {
-          detail: { cardId, deadline: newDeadline, timestamp: Date.now() }
-        });
-        document.dispatchEvent(saveEvent);
-      }, 10);
+      // Обновляем локальное состояние
+      setBoardState(updatedState);
       
-      // Дополнительная попытка сохранения с задержкой
-      setTimeout(() => {
-        // Сохраняем состояние ещё раз для надежности
-        saveStateToTiptap(updatedState);
-        console.log(`[${logTimestamp}] Выполнено дополнительное сохранение дедлайна`);
-      }, 500);
-      
+      // Сохраняем в Tiptap только один раз
+      // Удаляем дополнительные вызовы saveStateToTiptap, которые вызывают циклы
+      saveStateToTiptap(updatedState);
     } catch (error) {
       console.error(`[${logTimestamp}] Критическая ошибка при сохранении дедлайна:`, error);
     }
@@ -646,7 +608,7 @@ const KanbanBoardComponent = (props) => {
               if (typeof updateAttributes === 'function') {
                 updateAttributes({
                   boardState: {
-                    ...boardState,
+      ...boardState,
                     _recoveryTimestamp: Date.now()
                   }
                 });
@@ -721,9 +683,9 @@ const KanbanBoardComponent = (props) => {
             return;
           }
           
-          e.stopPropagation();
-          e.preventDefault();
-        }}
+                                      e.stopPropagation();
+                                      e.preventDefault();
+                                    }}
         onMouseDown={(e) => {
           // Проверяем, является ли клик нижней частью компонента
           const rect = e.currentTarget.getBoundingClientRect();
@@ -740,12 +702,12 @@ const KanbanBoardComponent = (props) => {
           e.preventDefault();
         }}
         onDoubleClick={(e) => {
-          e.stopPropagation();
-          e.preventDefault();
-        }}
-      >
+                          e.stopPropagation();
+                          e.preventDefault();
+                        }}
+                      >
         <div className="p-4 flex flex-col md:flex-row justify-between items-start md:items-center">
-          <div className="text-lg font-medium text-gray-900 dark:text-white mb-2 md:mb-0 w-1/3">
+          <div className="text-lg font-medium text-gray-900 dark:text-white mb-2 md:mb-0 w-full">
             <input
               type="text"
               value={boardState?.boardTitle || "Канбан-доска"}
@@ -773,86 +735,9 @@ const KanbanBoardComponent = (props) => {
                 }
               }}
               onBlur={handleTitleBlur}
-              className="kanban-board-title bg-transparent p-0 w-full text-lg font-medium text-gray-900 dark:text-white"
+              className="kanban-board-title bg-transparent p-0 w-full text-lg font-bold text-gray-900 dark:text-white text-center"
               placeholder="Название доски"
             />
-          </div>
-          
-          <div className="filters-container flex flex-col sm:flex-row gap-2 w-full md:w-auto md:justify-end md:ml-auto" style={{ justifyContent: 'flex-end' }}>
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Поиск задач..."
-                value={filterText}
-                onChange={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  console.log("Поиск:", e.target.value);
-                  setFilterText(e.target.value);
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                }}
-                onMouseDown={(e) => {
-                  e.stopPropagation();
-                }}
-                onKeyDown={(e) => {
-                  e.stopPropagation();
-                  if (e.key === 'Escape') {
-                    setFilterText('');
-                    e.target.blur();
-                  }
-                }}
-                className="kanban-board-search text-sm rounded-md bg-white dark:bg-gray-800 py-1 px-3 text-gray-900 dark:text-white w-full sm:w-48"
-              />
-              {filterText && (
-                <button
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    setFilterText('');
-                  }}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              )}
-            </div>
-            
-            <select
-              value={filterPriority || ''}
-              onChange={(e) => {
-                e.stopPropagation();
-                setFilterPriority(e.target.value || null);
-              }}
-              onClick={(e) => e.stopPropagation()}
-              onMouseDown={(e) => e.stopPropagation()}
-              className="text-sm rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-1 px-3 text-gray-900 dark:text-white"
-            >
-              <option value="">Все приоритеты</option>
-              <option value="low">Низкий</option>
-              <option value="medium">Средний</option>
-              <option value="high">Высокий</option>
-            </select>
-
-            <select
-              value={filterDeadline || ''}
-              onChange={(e) => {
-                e.stopPropagation();
-                setFilterDeadline(e.target.value || null);
-              }}
-              onClick={(e) => e.stopPropagation()}
-              onMouseDown={(e) => e.stopPropagation()}
-              className="text-sm rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-1 px-3 text-gray-900 dark:text-white"
-            >
-              <option value="">Все задачи</option>
-              <option value="with">С дедлайном</option>
-              <option value="without">Без дедлайна</option>
-              <option value="expired">Просроченные</option>
-              <option value="upcoming">Ближайшие</option>
-            </select>
           </div>
         </div>
 
@@ -891,7 +776,7 @@ const KanbanBoardComponent = (props) => {
                   style={{ width: `${stats.completionPercentage}%` }}
                 ></div>
               </div>
-            </div>
+                    </div>
           </div>
         </div>
         

@@ -302,7 +302,7 @@
 
 /* Увеличиваем отступы между карточками */
 .kanban-cards-container > * {
-  margin-bottom: 20px !important;
+  margin-bottom: 8px !important;
 }
 
 .kanban-cards-container > *:last-child {
@@ -435,4 +435,34 @@
 
 .dark .kanban-card .deadline-normal {
   color: #60a5fa;
+}
+
+/* Убираем фокус у всех полей ввода в канбане */
+.interactive-kanban-wrapper input:focus,
+.interactive-kanban-wrapper textarea:focus,
+.interactive-kanban-wrapper select:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: transparent !important;
+  ring-width: 0 !important;
+  --tw-ring-offset-width: 0 !important;
+  --tw-ring-offset-color: transparent !important;
+  --tw-ring-color: transparent !important;
+}
+
+/* Убираем кольцо фокуса из Tailwind */
+.interactive-kanban-wrapper .focus\:ring-0:focus,
+.interactive-kanban-wrapper .focus\:ring-1:focus,
+.interactive-kanban-wrapper .focus\:ring-2:focus,
+.interactive-kanban-wrapper .focus\:ring-offset-2:focus {
+  --tw-ring-offset-shadow: none !important;
+  --tw-ring-shadow: none !important;
+  box-shadow: none !important;
+}
+
+/* Удаление эффекта фокуса для поля даты */
+.interactive-kanban-wrapper .deadline-input:focus {
+  border-color: #e5e7eb !important;
+  outline: none !important;
+  box-shadow: none !important;
 }

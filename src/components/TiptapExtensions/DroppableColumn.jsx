@@ -43,7 +43,7 @@ const DroppableColumn = ({
         </span>
       </div>
 
-      <div className="min-h-[100px] kanban-cards-container">
+      <div className="min-h-[100px] kanban-cards-container pt-2">
         {cards.map((card, index) => (
           <DraggableCard
             key={card.id}

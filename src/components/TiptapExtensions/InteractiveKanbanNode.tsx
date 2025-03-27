@@ -58,7 +58,11 @@ export const InteractiveKanbanNode = Node.create<{
         renderHTML: (attributes) => {
           try {
             if (attributes && typeof attributes === 'object') {
-              return { 'data-board-state': JSON.stringify(attributes) };
+              // Обеспечиваем сохранение всех изменений в DOM-атрибуте
+              const cleanAttributes = JSON.parse(JSON.stringify(attributes));
+              // Добавляем дополнительную метку времени для надежности сохранения
+              cleanAttributes._htmlRenderTime = Date.now();
+              return { 'data-board-state': JSON.stringify(cleanAttributes) };
             }
           } catch (error) {
             console.error('Ошибка при рендеринге boardState:', error);

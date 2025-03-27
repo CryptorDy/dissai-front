@@ -1103,6 +1103,43 @@ export function RichTextEditor({
     };
   }, [autoSave, itemId, hasChanges, isSaving, forceSave]);
 
+  // Добавляем эффект для обработки обновлений канбан-доски
+  useEffect(() => {
+    if (!editor) return;
+    
+    // Обработчик события обновления канбан-доски
+    const handleKanbanUpdate = (event: CustomEvent<{timestamp: number, boardId: string}>) => {
+      console.log('Получено событие обновления канбан-доски:', event.detail);
+      
+      // Принудительно обновляем контент редактора
+      const html = editor.getHTML();
+      console.log('Принудительное обновление после изменения канбан-доски:', html.substring(0, 50) + '...');
+      
+      // Уведомляем о необходимости сохранения
+      setCurrentContent(html);
+      setHasChanges(true);
+      onChange(html);
+      
+      // Принудительное сохранение через 100мс
+      if (autoSave && itemId) {
+        console.log('Запускаем принудительное сохранение после изменения канбан-доски');
+        setTimeout(() => {
+          forceSave().catch(error => {
+            console.error('Ошибка при принудительном сохранении после изменения канбан:', error);
+          });
+        }, 100);
+      }
+    };
+    
+    // Добавляем обработчик события обновления канбан-доски
+    document.addEventListener('kanban-state-updated', handleKanbanUpdate as EventListener);
+    
+    return () => {
+      // Удаляем обработчик при размонтировании
+      document.removeEventListener('kanban-state-updated', handleKanbanUpdate as EventListener);
+    };
+  }, [editor, autoSave, itemId, onChange, forceSave]);
+
   return (
     <div className={withBackground ? "bg-white dark:bg-gray-800 rounded-xl p-8" : ""}>
       <div className="flex justify-between items-center mb-6">
