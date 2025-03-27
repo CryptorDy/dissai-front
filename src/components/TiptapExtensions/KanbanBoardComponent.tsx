@@ -239,7 +239,7 @@ const KanbanBoardComponent: React.FC<NodeViewProps> = (props) => {
       <div contentEditable={false} className="kanban-board-react-content not-prose">
         <div className="p-4 flex flex-col md:flex-row justify-between items-start md:items-center">
           <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2 md:mb-0">
-            Канбан-доска проекта
+              Название доски
           </h3>
           
           <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">

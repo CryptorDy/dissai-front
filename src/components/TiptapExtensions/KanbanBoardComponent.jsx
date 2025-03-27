@@ -40,7 +40,7 @@ const KanbanBoardComponent = (props) => {
       'card-3': { id: 'card-3', title: 'Задача 3', description: 'Описание задачи 3', priority: 'high', deadline: '' },
     },
     columnOrder: ['col-1', 'col-2', 'col-3'],
-    boardTitle: 'Канбан-доска проекта',
+    boardTitle: 'Название доски',
   };
 
   // Проверка существования и корректности данных из ноды

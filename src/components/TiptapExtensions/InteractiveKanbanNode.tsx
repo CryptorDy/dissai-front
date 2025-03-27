@@ -42,7 +42,7 @@ export const InteractiveKanbanNode = Node.create<{
             'card-3': { id: 'card-3', title: 'Задача 3', description: 'Описание задачи 3', priority: 'high' },
           },
           columnOrder: ['col-1', 'col-2', 'col-3'],
-          boardTitle: 'Канбан-доска проекта',
+          boardTitle: 'Название доски',
         }, // Используем объект по умолчанию вместо null
         parseHTML: (element) => {
           try {
