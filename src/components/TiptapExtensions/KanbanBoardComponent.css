@@ -466,3 +466,109 @@
   outline: none !important;
   box-shadow: none !important;
 }
+
+/* Стили для поддержки динамического количества колонок */
+.kanban-board {
+  width: 100%;
+  overflow-x: hidden;
+  padding-bottom: 16px; /* Для полосы прокрутки */
+}
+
+.kanban-columns-container {
+  width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  -ms-overflow-style: -ms-autohiding-scrollbar; /* для IE и Edge */
+  scroll-behavior: smooth;
+  /* Обеспечивает плавное прокручивание на всех браузерах */
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Стили для скроллбара контейнера колонок */
+.kanban-columns-container::-webkit-scrollbar {
+  height: 8px;
+}
+
+.kanban-columns-container::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+}
+
+.kanban-columns-container::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+.kanban-columns-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.kanban-column {
+  height: fit-content;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.kanban-cards-container {
+  overflow-y: auto;
+  overflow-x: hidden;
+  max-height: calc(100vh - 300px);
+  scrollbar-width: thin;
+}
+
+/* Затемнение краев для индикации прокрутки */
+.kanban-columns-container::after,
+.kanban-columns-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 20px;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.kanban-columns-container::before {
+  left: 0;
+  background: linear-gradient(to right, rgba(255,255,255,0.7), rgba(255,255,255,0));
+}
+
+.kanban-columns-container::after {
+  right: 0;
+  background: linear-gradient(to left, rgba(255,255,255,0.7), rgba(255,255,255,0));
+}
+
+/* Темная тема */
+.dark .kanban-columns-container::before {
+  background: linear-gradient(to right, rgba(17,24,39,0.7), rgba(17,24,39,0));
+}
+
+.dark .kanban-columns-container::after {
+  background: linear-gradient(to left, rgba(17,24,39,0.7), rgba(17,24,39,0));
+}
+
+/* Стили для скроллбара */
+.kanban-cards-container::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.kanban-cards-container::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 3px;
+}
+
+.kanban-cards-container::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.kanban-cards-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+/* Стили для кнопки выбора колонки завершения */
+.kanban-column-header button.text-green-500 {
+  box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.2);
+}

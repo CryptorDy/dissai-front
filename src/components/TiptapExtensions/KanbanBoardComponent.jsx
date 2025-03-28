@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { NodeViewWrapper } from '@tiptap/react';
+import ReactDOM from 'react-dom';
 
 // Удалено использование react-dnd
 // import { useDrag, useDrop } from 'react-dnd';
@@ -20,6 +21,9 @@ const KanbanBoardComponent = (props) => {
   // Состояние для drag and drop
   const [draggedCardId, setDraggedCardId] = useState(null);
   const [draggedFromColumnId, setDraggedFromColumnId] = useState(null);
+  // Состояние для модального окна подтверждения удаления
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [columnToDelete, setColumnToDelete] = useState(null);
 
   // Защита от проблем с рендерингом при нескольких экземплярах
   const instanceId = React.useMemo(() => `kanban-${generateId()}`, []);
@@ -510,6 +514,32 @@ const KanbanBoardComponent = (props) => {
     return ids.map(cardId => boardState.cards[cardId]).filter(card => card !== undefined);
   };
 
+  // Функция установки столбца как завершающего для процента выполнения
+  const handleSetAsCompletedColumn = (columnId) => {
+    if (!boardState || !boardState.columns) return;
+    
+    setBoardState(prevState => {
+      if (!prevState || !prevState.columns) return prevState;
+      
+      // Создаем новые колонки с обновленной меткой завершения
+      const updatedColumns = prevState.columns.map(col => ({
+        ...col,
+        isCompletedColumn: col.id === columnId
+      }));
+      
+      // Обновляем состояние доски
+      const updatedState = {
+        ...prevState,
+        columns: updatedColumns
+      };
+      
+      // Сохраняем состояние
+      saveStateToTiptap(updatedState);
+      
+      return updatedState;
+    });
+  };
+
   // Статистика задач
   const calculateStats = () => {
     // Проверяем существование boardState и его свойств
@@ -526,7 +556,12 @@ const KanbanBoardComponent = (props) => {
     }
     
     const total = Object.keys(boardState.cards).length;
-    const completed = boardState.columns.find(col => col.id === 'col-3')?.cardIds.length || 0;
+    
+    // Находим колонку с меткой isCompletedColumn или используем 'col-3' по умолчанию
+    const completedColumn = boardState.columns.find(col => col.isCompletedColumn) || 
+                          boardState.columns.find(col => col.id === 'col-3');
+    
+    const completed = completedColumn?.cardIds?.length || 0;
     const inProgress = boardState.columns.find(col => col.id === 'col-2')?.cardIds.length || 0;
     const planned = boardState.columns.find(col => col.id === 'col-1')?.cardIds.length || 0;
     
@@ -658,181 +693,441 @@ const KanbanBoardComponent = (props) => {
     };
   }, [boardState, updateAttributes, instanceId]);
 
-  // Рендеринг компонента
+  // Функция добавления новой колонки
+  const handleAddColumn = () => {
+    if (!boardState || !boardState.columns || !boardState.columnOrder) return;
+    
+    // Генерируем уникальный ID для новой колонки
+    const newColumnId = `col-${generateId()}`;
+    
+    setBoardState(prevState => {
+      if (!prevState || !prevState.columns || !prevState.columnOrder) return prevState;
+      
+      // Создаем новую колонку
+      const newColumn = {
+        id: newColumnId,
+        title: 'Новая колонка',
+        cardIds: []
+      };
+      
+      // Обновляем состояние доски
+      const updatedState = {
+        ...prevState,
+        columns: [...prevState.columns, newColumn],
+        columnOrder: [...prevState.columnOrder, newColumnId]
+      };
+      
+      // Сохраняем состояние
+      saveStateToTiptap(updatedState);
+      
+      return updatedState;
+    });
+  };
+  
+  // Функция удаления колонки
+  const handleDeleteColumn = (columnId) => {
+    if (!boardState || !boardState.columns || !boardState.columnOrder) return;
+    
+    // Нельзя удалить последнюю колонку
+    if (boardState.columnOrder.length <= 1) return;
+    
+    setBoardState(prevState => {
+      if (!prevState || !prevState.columns || !prevState.columnOrder) return prevState;
+      
+      // Находим колонку для удаления
+      const column = prevState.columns.find(col => col.id === columnId);
+      if (!column) return prevState;
+      
+      // Массив ID карточек, которые нужно удалить
+      const cardIdsToRemove = column.cardIds || [];
+      
+      // Создаем новые объекты для обновленного состояния
+      const newColumns = prevState.columns.filter(col => col.id !== columnId);
+      const newColumnOrder = prevState.columnOrder.filter(id => id !== columnId);
+      
+      // Создаем копию карточек и удаляем карточки из удаляемой колонки
+      const newCards = { ...prevState.cards };
+      cardIdsToRemove.forEach(cardId => {
+        delete newCards[cardId];
+      });
+      
+      // Обновляем состояние доски
+      const updatedState = {
+        ...prevState,
+        columns: newColumns,
+        columnOrder: newColumnOrder,
+        cards: newCards
+      };
+      
+      // Сохраняем состояние
+      saveStateToTiptap(updatedState);
+      
+      return updatedState;
+    });
+    
+    // Сбрасываем состояние удаления столбца
+    setColumnToDelete(null);
+    setDeleteModalVisible(false);
+  };
+
+  // Функция для запроса подтверждения удаления столбца
+  const confirmDeleteColumn = (columnId) => {
+    // Находим колонку для отображения названия в модальном окне
+    const column = boardState?.columns?.find(col => col.id === columnId);
+    if (column) {
+      setColumnToDelete(column);
+      setDeleteModalVisible(true);
+    }
+  };
+
+  // Функция подтверждения удаления столбца из модального окна
+  const handleConfirmDeleteColumn = () => {
+    if (columnToDelete) {
+      handleDeleteColumn(columnToDelete.id);
+    }
+    setDeleteModalVisible(false);
+    setColumnToDelete(null);
+  };
+
+  // Функция отмены удаления столбца
+  const cancelDeleteColumn = () => {
+    setDeleteModalVisible(false);
+    setColumnToDelete(null);
+  };
+
   return (
-    <NodeViewWrapper 
-      className="interactive-kanban-wrapper relative p-1 bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg mb-4"
-      contentEditable={false}
-      data-kanban-board="true"
-      onPointerDown={(e) => {
-        const rect = e.currentTarget.getBoundingClientRect();
-        
-        // Если клик произошел за нижней границей канбан-доски,
-        // пропускаем его для создания нового параграфа
-        if (e.clientY > rect.bottom) {
-          // Не останавливаем распространение, позволяем редактору обработать клик
-          return;
-        }
-        
-        // Если клик произошел вне визуальных границ компонента слева/справа/сверху, не блокируем
-        if (
-          e.clientY < rect.top ||
-          e.clientX > rect.right ||
-          e.clientX < rect.left
-        ) {
-          return;
-        }
-        
-        // Блокируем клик внутри канбан-доски 
-        e.stopPropagation();
-      }}
-    >
-      {/* Добавляем обертку с предотвращением событий */}
-      <div 
-        contentEditable={false}
-        className="kanban-board-react-content not-prose"
-        style={{ pointerEvents: 'auto', zIndex: 1 }}
+    <>
+      <NodeViewWrapper 
+        className="relative" 
+        data-kanban-board="true"
         onClick={(e) => {
-          // Проверяем, является ли клик нижней частью компонента
-          const rect = e.currentTarget.getBoundingClientRect();
-          if (e.clientY > rect.bottom - 20) {
-            // Не предотвращаем события для нижней части
-            return;
+          // Проверяем, существует ли текущий editor
+          if (editor && editor.isActive) {
+            // Предотвращаем выделение
+            editor.commands.blur();
           }
           
-                                      e.stopPropagation();
-                                      e.preventDefault();
-                                    }}
-        onMouseDown={(e) => {
-          // Проверяем, является ли клик нижней частью компонента
-          const rect = e.currentTarget.getBoundingClientRect();
-          if (e.clientY > rect.bottom - 20) {
-            // Не предотвращаем события для нижней части
-            return;
-          }
-          
+          // Блокируем клик внутри канбан-доски 
           e.stopPropagation();
-          e.preventDefault();
         }}
-        onMouseUp={(e) => {
-          e.stopPropagation();
-          e.preventDefault();
-        }}
-        onDoubleClick={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                        }}
-                      >
-        <div className="p-4 flex flex-col md:flex-row justify-between items-start md:items-center">
-          <div className="text-lg font-medium text-gray-900 dark:text-white mb-2 md:mb-0 w-full">
-            <input
-              type="text"
-              value={boardState?.boardTitle || "Канбан-доска"}
-              onChange={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const newTitle = e.target.value;
-                console.log("Изменение названия:", newTitle);
-                handleBoardTitleChange(newTitle);
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
-              }}
-              onMouseDown={(e) => {
-                e.stopPropagation();
-              }}
-              onKeyDown={(e) => {
-                e.stopPropagation();
-                // Сохраняем при нажатии Enter
-                if (e.key === 'Enter') {
-                  console.log("Сохранение названия при Enter");
-                  e.target.blur();
-                  // Принудительно сохраняем текущее состояние
-                  saveStateToTiptap(boardState);
-                }
-              }}
-              onBlur={handleTitleBlur}
-              className="kanban-board-title bg-transparent p-0 w-full text-lg font-bold text-gray-900 dark:text-white text-center"
-              placeholder="Название доски"
-            />
-          </div>
-        </div>
-
-        <div className="px-4 pb-2">
-          <div className="flex items-center justify-between bg-white dark:bg-gray-800 p-2 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm mb-4">
-            <div className="flex gap-2 flex-wrap">
-              <div className="stat-item text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 py-1 px-2 rounded">
-                <span className="font-medium">Всего задач:</span> {stats.total}
-              </div>
-              <div className="stat-item text-xs bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 py-1 px-2 rounded">
-                <span className="font-medium">Завершено:</span> {stats.completed}
-              </div>
-              <div className="stat-item text-xs bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 py-1 px-2 rounded">
-                <span className="font-medium">В процессе:</span> {stats.inProgress}
-              </div>
-              <div className="stat-item text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 py-1 px-2 rounded">
-                <span className="font-medium">Планируется:</span> {stats.planned}
-              </div>
-              {stats.withDeadline > 0 && (
-                <div className="stat-item text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300 py-1 px-2 rounded">
-                  <span className="font-medium">С дедлайном:</span> {stats.withDeadline}
-                </div>
-              )}
-              {stats.expiredDeadline > 0 && (
-                <div className="stat-item text-xs bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 py-1 px-2 rounded">
-                  <span className="font-medium">Просрочено:</span> {stats.expiredDeadline}
-                </div>
-              )}
-            </div>
+      >
+        {/* Добавляем обертку с предотвращением событий */}
+        <div 
+          contentEditable={false}
+          className="kanban-board not-prose shadow-sm my-2 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden"
+          style={{ pointerEvents: 'auto', zIndex: 1 }}
+          onClick={(e) => {
+            // Проверяем, является ли клик нижней частью компонента
+            const rect = e.currentTarget.getBoundingClientRect();
+            if (e.clientY > rect.bottom - 20) {
+              // Не предотвращаем события для нижней части
+              return;
+            }
             
-            <div className="hidden sm:flex items-center">
-              <div className="text-xs text-gray-500 dark:text-gray-400 mr-2">Выполнено: {stats.completionPercentage}%</div>
-              <div className="w-24 bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
-                <div 
-                  className="bg-green-500 h-full rounded-full" 
-                  style={{ width: `${stats.completionPercentage}%` }}
-                ></div>
+            e.stopPropagation();
+            e.preventDefault();
+          }}
+          onMouseDown={(e) => {
+            // Проверяем, является ли клик нижней частью компонента
+            const rect = e.currentTarget.getBoundingClientRect();
+            if (e.clientY > rect.bottom - 20) {
+              // Не предотвращаем события для нижней части
+              return;
+            }
+            
+            e.stopPropagation();
+            e.preventDefault();
+          }}
+          onMouseUp={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+          }}
+          onDoubleClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+          }}
+        >
+          <div className="p-4 flex flex-col md:flex-row justify-between items-start md:items-center">
+            <div className="text-lg font-medium text-gray-900 dark:text-white mb-2 md:mb-0 w-full">
+              <input
+                type="text"
+                value={boardState?.boardTitle || "Канбан-доска"}
+                onChange={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const newTitle = e.target.value;
+                  console.log("Изменение названия:", newTitle);
+                  handleBoardTitleChange(newTitle);
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                }}
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                }}
+                onKeyDown={(e) => {
+                  e.stopPropagation();
+                  // Сохраняем при нажатии Enter
+                  if (e.key === 'Enter') {
+                    console.log("Сохранение названия при Enter");
+                    e.target.blur();
+                    // Принудительно сохраняем текущее состояние
+                    saveStateToTiptap(boardState);
+                  }
+                }}
+                onBlur={handleTitleBlur}
+                className="kanban-board-title bg-transparent p-0 w-full text-lg font-bold text-gray-900 dark:text-white text-center"
+                placeholder="Название доски"
+              />
+            </div>
+          </div>
+
+          <div className="px-4 pb-2">
+            <div className="flex items-center justify-between bg-white dark:bg-gray-800 p-2 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm mb-4">
+              <div className="flex gap-2 flex-wrap">
+                <div className="stat-item text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 py-1 px-2 rounded">
+                  <span className="font-medium">Всего задач:</span> {stats.total}
+                </div>
+                <div className="stat-item text-xs bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 py-1 px-2 rounded">
+                  <span className="font-medium">Завершено:</span> {stats.completed}
+                </div>
+                <div className="stat-item text-xs bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 py-1 px-2 rounded">
+                  <span className="font-medium">В процессе:</span> {stats.inProgress}
+                </div>
+                <div className="stat-item text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 py-1 px-2 rounded">
+                  <span className="font-medium">Планируется:</span> {stats.planned}
+                </div>
               </div>
+              
+              <div className="hidden sm:flex items-center">
+                <div className="text-xs text-gray-500 dark:text-gray-400 mr-2">Выполнено: {stats.completionPercentage}%</div>
+                <div className="w-24 bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                  <div 
+                    className="bg-green-500 h-full rounded-full" 
+                    style={{ width: `${stats.completionPercentage}%` }}
+                  ></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="kanban-columns-container overflow-x-auto pb-2">
+            <div className="inline-flex gap-4 p-4 w-max min-w-full">
+              {boardState?.columnOrder?.map((columnId, index) => {
+                const column = boardState?.columns?.find(c => c.id === columnId);
+                if (!column) return null;
+
+                // Фильтрованные карточки
+                const cards = filteredCards(columnId, column.cardIds);
+                // Первая колонка (Планируется)
+                const isFirstColumn = index === 0;
+                // Проверяем, является ли эта колонка завершающей
+                const isCompletedColumn = column.isCompletedColumn || false;
+
+                return (
+                  <div
+                    key={column.id}
+                    className="kanban-column bg-gray-50 dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700 min-w-[250px] flex-shrink-0 w-[300px]"
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleDrop(column.id, e);
+                    }}
+                  >
+                    <div className="kanban-column-header flex items-center mb-3 pb-2 border-b border-gray-200 dark:border-gray-700">
+                      <input
+                        type="text"
+                        value={column.title}
+                        onChange={(e) => handleColumnTitleChange(column.id, e.target.value)}
+                        className="text-sm font-medium text-gray-700 dark:text-gray-300 bg-transparent border-none p-0 focus:ring-0 mr-auto"
+                        onMouseDown={e => e.stopPropagation()}
+                        onKeyDown={e => e.stopPropagation()}
+                      />
+                      <div className="flex items-center">
+                        {/* Кнопка отметки колонки как завершающей с новой иконкой */}
+                        <button
+                          className={`flex items-center justify-center transition-colors mx-1 rounded ${isCompletedColumn ? 
+                            'text-green-500 hover:text-green-600 bg-green-50 dark:bg-green-900/20' : 
+                            'text-gray-400 hover:text-green-500'}`}
+                          onClick={() => handleSetAsCompletedColumn(column.id)}
+                          onMouseDown={e => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                          }}
+                          title={isCompletedColumn ? "Эта колонка используется для расчета % завершения" : "Отметить как колонку завершения"}
+                          style={{ width: '24px', height: '24px' }}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-17l6 4 6-4 6 4v12l-6-4-6 4" />
+                          </svg>
+                        </button>
+                        
+                        <button
+                          className="flex items-center justify-center text-blue-500 hover:text-blue-600 transition-colors mx-1 w-6 h-6"
+                          onClick={() => handleAddCard(column.id)}
+                          onMouseDown={e => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                          }}
+                          title="Добавить задачу"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                          </svg>
+                        </button>
+                        
+                        {/* Кнопка удаления колонки (если это не единственная колонка) */}
+                        {boardState?.columnOrder?.length > 1 && (
+                          <button
+                            className="flex items-center justify-center text-gray-400 hover:text-red-500 transition-colors mx-1 w-6 h-6"
+                            onClick={() => confirmDeleteColumn(column.id)}
+                            onMouseDown={e => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                            }}
+                            title="Удалить колонку"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        )}
+                        
+                        <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded-full ml-2">
+                          {cards.length}
+                        </span>
+                      </div>
                     </div>
+
+                    <div className="min-h-[100px] kanban-cards-container pt-2">
+                      {cards.map((card, index) => (
+                        <DraggableCard
+                          key={card.id}
+                          card={card}
+                          columnId={column.id}
+                          handleDeleteCard={handleDeleteCard}
+                          handleCardTitleChange={handleCardTitleChange}
+                          handleCardDescriptionChange={handleCardDescriptionChange}
+                          handleCardPriorityChange={handleCardPriorityChange}
+                          handleDeadlineChange={handleDeadlineChange}
+                          handleDragStart={handleDragStart}
+                          isLastCard={index === cards.length - 1}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+              
+              {/* Кнопка добавления новой колонки */}
+              <div className="flex items-center justify-center">
+                <button
+                  className="flex items-center justify-center text-blue-500 hover:text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-800/40 rounded-lg transition-colors border border-dashed border-blue-300 dark:border-blue-700 w-12 h-24 mx-2"
+                  onClick={() => handleAddColumn()}
+                  onMouseDown={e => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                  }}
+                  title="Добавить колонку"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4">
-          {boardState?.columnOrder?.map((columnId, index) => {
-            const column = boardState?.columns?.find(c => c.id === columnId);
-            if (!column) return null;
+      </NodeViewWrapper>
 
-            // Фильтрованные карточки
-            const cards = filteredCards(columnId, column.cardIds);
-            // Первая колонка (Планируется)
-            const isFirstColumn = index === 0;
-
-            return (
-              <DroppableColumn
-                key={column.id}
-                column={column}
-                cards={cards}
-                handleColumnTitleChange={handleColumnTitleChange}
-                handleAddCard={handleAddCard}
-                handleDeleteCard={handleDeleteCard}
-                handleCardTitleChange={handleCardTitleChange}
-                handleCardDescriptionChange={handleCardDescriptionChange}
-                handleCardPriorityChange={handleCardPriorityChange}
-                handleDeadlineChange={handleDeadlineChange}
-                handleDragStart={handleDragStart}
-                handleDrop={handleDrop}
-                isFirstColumn={isFirstColumn}
-              />
-            );
-          }) || (
-            <div className="col-span-3 text-center p-4 text-gray-500">
-              Канбан-доска загружается...
+      {/* Модальное окно через портал для корректного отображения поверх остального контента */}
+      {deleteModalVisible && columnToDelete && ReactDOM.createPortal(
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center p-4"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 9999,
+            animation: 'fadeIn 0.2s ease-in-out'
+          }}
+          onMouseDown={e => {
+            e.stopPropagation();
+            e.preventDefault();
+          }}
+          onClick={e => {
+            e.stopPropagation();
+            e.preventDefault();
+          }}
+        >
+          <div 
+            className="bg-white dark:bg-gray-800 rounded-lg shadow-lg max-w-md w-full p-6 border border-gray-200 dark:border-gray-700"
+            style={{ animation: 'slideIn 0.3s ease-out' }}
+          >
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Удаление столбца</h3>
+            <p className="text-gray-700 dark:text-gray-300 mb-4">
+              Вы уверены, что хотите удалить столбец "{columnToDelete.title}"? 
+              Все задачи внутри этого столбца будут также удалены.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 dark:text-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-md transition-colors"
+                onClick={cancelDeleteColumn}
+                onMouseDown={e => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                }}
+              >
+                Отмена
+              </button>
+              <button
+                className="px-4 py-2 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-md transition-colors"
+                onClick={handleConfirmDeleteColumn}
+                onMouseDown={e => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                }}
+              >
+                Удалить
+              </button>
             </div>
-          )}
-        </div>
-      </div>
-    </NodeViewWrapper>
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
   );
 };
+
+// Добавляем стили для анимации
+const style = document.createElement('style');
+style.innerHTML = `
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes slideIn {
+  from { transform: translateY(-20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* Медиа-запрос для мобильных устройств */
+@media (max-width: 640px) {
+  .fixed.inset-0.z-\\[9999\\] {
+    padding: 12px !important;
+  }
+  .fixed.inset-0.z-\\[9999\\] > div {
+    width: calc(100% - 20px) !important;
+    max-width: 100% !important;
+  }
+}
+`;
+document.head.appendChild(style);
 
 export default KanbanBoardComponent; 
