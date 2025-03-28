@@ -25,10 +25,21 @@ const DraggableCard = ({
   // Функция для автоматического изменения размера текстового поля
   const autoResizeTextarea = () => {
     if (textareaRef.current) {
-      // Сначала сбрасываем высоту до минимальной
-      textareaRef.current.style.height = '1.5em';
-      // Затем устанавливаем высоту на основе содержимого
-      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+      // Сохраняем текущую прокрутку страницы
+      const originalScrollPos = window.scrollY;
+      
+      // Сбрасываем высоту до минимальной
+      textareaRef.current.style.height = 'auto';
+      
+      // Устанавливаем фиксированную минимальную высоту
+      const minHeight = 24; // Высота одной строки в пикселях
+      const contentHeight = Math.max(textareaRef.current.scrollHeight, minHeight);
+      
+      // Устанавливаем высоту на основе содержимого, но не менее minHeight
+      textareaRef.current.style.height = contentHeight + 'px';
+      
+      // Восстанавливаем позицию прокрутки
+      window.scrollTo(0, originalScrollPos);
     }
   };
   
@@ -339,9 +350,9 @@ const DraggableCard = ({
           value={card.description}
           onChange={(e) => {
             handleCardDescriptionChange(card.id, e.target.value);
-            // Автоматическое изменение размера уже происходит в эффекте
+            // Автоматическое изменение размера происходит в эффекте
           }}
-          className="text-xs text-gray-500 dark:text-gray-400 w-full bg-transparent border-none p-0 focus:ring-0 resize-none"
+          className="text-xs text-gray-500 dark:text-gray-400 w-full bg-transparent border-none p-0 focus:ring-0 resize-none min-h-[24px]"
           rows={1}
           onKeyDown={e => e.stopPropagation()}
           onMouseDown={e => e.stopPropagation()}
