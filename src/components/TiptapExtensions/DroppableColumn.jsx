@@ -29,15 +29,28 @@ const DroppableColumn = ({
         handleDrop(column.id, e);
       }}
     >
-      <div className="kanban-column-header flex items-center justify-between mb-3">
+      <div className="kanban-column-header flex items-center mb-3">
         <input
           type="text"
           value={column.title}
           onChange={(e) => handleColumnTitleChange(column.id, e.target.value)}
-          className="text-sm font-medium text-gray-700 dark:text-gray-300 bg-transparent border-none p-0 focus:ring-0 w-full"
+          className="text-sm font-medium text-gray-700 dark:text-gray-300 bg-transparent border-none p-0 focus:ring-0 mr-auto"
           onMouseDown={e => e.stopPropagation()}
           onKeyDown={e => e.stopPropagation()}
         />
+        <button
+          className="text-blue-500 hover:text-blue-600 transition-colors mx-2"
+          onClick={() => handleAddCard(column.id)}
+          onMouseDown={e => {
+            e.stopPropagation();
+            e.preventDefault();
+          }}
+          title="Добавить задачу"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+        </button>
         <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded-full">
           {cards.length}
         </span>
@@ -59,20 +72,6 @@ const DroppableColumn = ({
           />
         ))}
       </div>
-
-      {/* Кнопка добавления только в первой колонке (Планируется) */}
-      {isFirstColumn && (
-        <button
-          className="mt-4 text-sm text-white bg-blue-500 hover:bg-blue-600 py-1 px-3 rounded-md w-full transition-colors"
-          onClick={() => handleAddCard(column.id)}
-          onMouseDown={e => {
-            e.stopPropagation();
-            e.preventDefault();
-          }}
-        >
-          + Добавить задачу
-        </button>
-      )}
     </div>
   );
 };

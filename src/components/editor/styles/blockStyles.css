@@ -1223,25 +1223,13 @@ input.task-checkbox:checked + label span:not(.task-checkbox-icon):not([class*="b
   opacity: 0.9;
 }
 
-/* Специальные стили для активной карточки */
-.kanban-column:nth-child(2) .kanban-card {
-  position: relative;
-  overflow: hidden;
+/* Стили для аватаров пользователей */
+.kanban-card .rounded-full {
+  transition: all 0.2s ease;
 }
 
-.kanban-column:nth-child(2) .kanban-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 4px;
-  height: 100%;
-  background-color: #f59e0b;
-  transition: all 0.3s ease;
-}
-
-.kanban-column:nth-child(2) .kanban-card:hover::before {
-  background-color: #d97706;
+.kanban-card:hover .rounded-full {
+  transform: scale(1.08);
 }
 
 /* Анимация счетчиков в заголовках колонок */
@@ -1295,13 +1283,4 @@ input.task-checkbox:checked + label span:not(.task-checkbox-icon):not([class*="b
 @keyframes blinkArrow {
   0%, 100% { opacity: 0; }
   50% { opacity: 1; }
-}
-
-/* Стили для аватаров пользователей */
-.kanban-card .rounded-full {
-  transition: all 0.2s ease;
-}
-
-.kanban-card:hover .rounded-full {
-  transform: scale(1.08);
 } 

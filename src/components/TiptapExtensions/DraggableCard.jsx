@@ -39,29 +39,25 @@ const DraggableCard = ({
   
   // Определяем цвет полоски в зависимости от приоритета и колонки
   let borderLeftColor = '#e5e7eb'; // Цвет по умолчанию - серый
-  // Только для колонок "Планируется" и "Завершено" показываем цветные полоски
-  if (columnId !== 'col-2') { // Не для колонки "В процессе" 
-    if (card.priority === 'high') {
-      borderLeftColor = '#f87171'; // Красный для высокого приоритета
-    } else if (card.priority === 'medium') {
-      borderLeftColor = '#fbbf24'; // Желтый для среднего приоритета
-    } else if (card.priority === 'low') {
-      borderLeftColor = '#60a5fa'; // Синий для низкого приоритета
-    }
+  // Применяем цветные полоски ко всем колонкам
+  if (card.priority === 'high') {
+    borderLeftColor = '#f87171'; // Красный для высокого приоритета
+  } else if (card.priority === 'medium') {
+    borderLeftColor = '#fbbf24'; // Желтый для среднего приоритета
+  } else if (card.priority === 'low') {
+    borderLeftColor = '#60a5fa'; // Синий для низкого приоритета
   }
 
   // Определяем классы для фона карточки
   let cardBgClass = 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-700';
   
-  // Применяем цветное выделение только для колонок "Планируется" и "Завершено"
-  if (columnId !== 'col-2') {
-    if (card.priority === 'high') {
-      cardBgClass = 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20';
-    } else if (card.priority === 'medium') {
-      cardBgClass = 'border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20';
-    } else if (card.priority === 'low') {
-      cardBgClass = 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20';
-    }
+  // Применяем цветное выделение ко всем колонкам одинаково
+  if (card.priority === 'high') {
+    cardBgClass = 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20';
+  } else if (card.priority === 'medium') {
+    cardBgClass = 'border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20';
+  } else if (card.priority === 'low') {
+    cardBgClass = 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20';
   }
 
   // Определяем, истекает ли срок скоро или уже истек
